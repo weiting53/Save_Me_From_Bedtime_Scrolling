@@ -1,0 +1,64 @@
+# ======================
+# Xcode / iOS
+# ======================
+
+DerivedData/
+build/
+
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+.build/
+.swiftpm/
+
+# Dependency managers (optional)
+Pods/
+Podfile.lock
+Carthage/Build/
+
+# ======================
+# Python
+# ======================
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ruff_cache/
+
+.venv/
+venv/
+env/
+
+.uv/
+uv.lock
+
+# ======================
+# VS Code
+# ======================
+
+.vscode/
+
+# ======================
+# macOS
+# ======================
+
+.DS_Store
+
+# ======================
+# Secrets
+# ======================
+
+.env
+.env.local
+*.key
+*.pem
+
+# ======================
+# Logs / temp
+# ======================
+
+*.log
+tmp/
+temp/

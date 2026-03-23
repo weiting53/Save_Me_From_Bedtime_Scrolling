@@ -15,7 +15,7 @@ struct OnboardingView: View {
                         foxState: .lively,
                         title: "歡迎來到 Wind Down Sofa",
                         subtitle: "你的溫柔睡前陪伴者",
-                        body: "我們不強迫你，只是在你快要破功的時刻，輕輕問你一句話。"
+                        bodyText: "我們不強迫你，只是在你快要破功的時刻，輕輕問你一句話。"
                     )
                     .tag(0)
 
@@ -23,7 +23,7 @@ struct OnboardingView: View {
                         foxState: .drowsy,
                         title: "它是怎麼運作的？",
                         subtitle: "三個簡單步驟",
-                        body: "1. 設定今晚目標睡眠時間\n2. 到時間前 30 分鐘收到通知\n3. 選擇準備睡了，或再給自己 15 分鐘"
+                        bodyText: "1. 設定今晚目標睡眠時間\n2. 到時間前 30 分鐘收到通知\n3. 選擇準備睡了，或再給自己 15 分鐘"
                     )
                     .tag(1)
 
@@ -31,7 +31,7 @@ struct OnboardingView: View {
                         foxState: .lively,
                         title: "記錄你的模式",
                         subtitle: "越來越了解自己",
-                        body: "每天的選擇都會被記錄下來，幫助你看見自己的睡眠習慣，慢慢建立 Streak。"
+                        bodyText: "每天的選擇都會被記錄下來，幫助你看見自己的睡眠習慣，慢慢建立 Streak。"
                     )
                     .tag(2)
 
@@ -57,7 +57,7 @@ private struct OnboardingPageView: View {
     let foxState: FoxState
     let title: String
     let subtitle: String
-    let body: String
+    let bodyText: String
 
     var body: some View {
         VStack(spacing: 24) {
@@ -76,7 +76,7 @@ private struct OnboardingPageView: View {
                     .font(AppFont.subtitle())
                     .foregroundColor(Color.textSecondary)
 
-                Text(body)
+                Text(bodyText)
                     .font(AppFont.bodyText())
                     .foregroundColor(Color.textSecondary)
                     .multilineTextAlignment(.center)
