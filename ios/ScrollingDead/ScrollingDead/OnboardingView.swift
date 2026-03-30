@@ -301,6 +301,10 @@ struct OnboardingView: View {
 
     // MARK: - Actions
 
+    // TODO: Replace with your GitHub raw URL after uploading ScrollingDead.shortcut
+    // Format: https://raw.githubusercontent.com/<user>/<repo>/main/ScrollingDead.shortcut
+    private let shortcutFileURL = "https://raw.githubusercontent.com/PLACEHOLDER/ScrollingDead.shortcut"
+
     private func handleInstall() {
         guard installPhase == .idle else { return }
         installPhase = .installing
@@ -308,7 +312,7 @@ struct OnboardingView: View {
         // Update the localised reminder time in L so the guide shows correct time
         L.reminderTimeString = state.reminderFormatted
 
-        // Ask for notification permission
+        // Ask for notification permission + schedule morning insight
         Task {
             await NotificationManager.requestPermission()
             NotificationManager.scheduleMorningInsight(
@@ -318,29 +322,27 @@ struct OnboardingView: View {
             )
         }
 
-        // Generate + share the .shortcut file
-        guard let fileURL = ShortcutGenerator.generate() else {
+        // Open shortcut via URL scheme — iOS 18 compatible
+        // The shortcut file is hosted on GitHub and imported directly by the Shortcuts app
+        let encoded = shortcutFileURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? shortcutFileURL
+        let importURLString = "shortcuts://import-shortcut?url=\(encoded)"
+
+        guard let importURL = URL(string: importURLString) else {
             installPhase = .idle
             return
         }
 
-        // Share sheet so user can open it in Shortcuts
-        let av = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let root  = scene.windows.first?.rootViewController {
-            av.completionWithItemsHandler = { _, completed, _, _ in
-                DispatchQueue.main.async {
-                    if completed {
-                        withAnimation { installPhase = .done }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            withAnimation { showGuide = true }
-                        }
-                    } else {
-                        installPhase = .idle
+        UIApplication.shared.open(importURL) { success in
+            DispatchQueue.main.async {
+                if success {
+                    withAnimation { self.installPhase = .done }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        withAnimation { self.showGuide = true }
                     }
+                } else {
+                    self.installPhase = .idle
                 }
             }
-            root.present(av, animated: true)
         }
     }
 

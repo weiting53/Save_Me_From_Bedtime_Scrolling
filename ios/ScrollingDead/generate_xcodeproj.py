@@ -13,7 +13,6 @@ SOURCE_FILES = [
     ("ScrollingDeadApp.swift", "ScrollingDeadApp.swift"),
     ("OnboardingView.swift", "OnboardingView.swift"),
     ("NotificationManager.swift", "NotificationManager.swift"),
-    ("ShortcutGenerator.swift", "ShortcutGenerator.swift"),
     ("Strings.swift", "Strings.swift"),
 ]
 

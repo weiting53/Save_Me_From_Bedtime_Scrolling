@@ -9,8 +9,7 @@
 		BB000000000000000000600 /* ScrollingDeadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* ScrollingDeadApp.swift */; };
 		BB000000000000000000601 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000101 /* OnboardingView.swift */; };
 		BB000000000000000000602 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000102 /* NotificationManager.swift */; };
-		BB000000000000000000603 /* ShortcutGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000103 /* ShortcutGenerator.swift */; };
-		BB000000000000000000604 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000104 /* Strings.swift */; };
+		BB000000000000000000603 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000103 /* Strings.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -18,10 +17,9 @@
 		BB000000000000000000100 /* ScrollingDeadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollingDeadApp.swift; sourceTree = "<group>"; };
 		BB000000000000000000101 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		BB000000000000000000102 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
-		BB000000000000000000103 /* ShortcutGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutGenerator.swift; sourceTree = "<group>"; };
-		BB000000000000000000104 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
-		BB000000000000000000105 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		BB000000000000000000106 /* ScrollingDead.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScrollingDead.entitlements; sourceTree = "<group>"; };
+		BB000000000000000000103 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
+		BB000000000000000000104 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB000000000000000000105 /* ScrollingDead.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ScrollingDead.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,7 +69,6 @@
 				BB000000000000000000101,
 				BB000000000000000000102,
 				BB000000000000000000103,
-				BB000000000000000000104,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -80,8 +77,8 @@
 		BB000000000000000000022 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				BB000000000000000000104,
 				BB000000000000000000105,
-				BB000000000000000000106,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -152,8 +149,7 @@
 				BB000000000000000000600 /* ScrollingDeadApp.swift in Sources */,
 				BB000000000000000000601 /* OnboardingView.swift in Sources */,
 				BB000000000000000000602 /* NotificationManager.swift in Sources */,
-				BB000000000000000000603 /* ShortcutGenerator.swift in Sources */,
-				BB000000000000000000604 /* Strings.swift in Sources */,
+				BB000000000000000000603 /* Strings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
