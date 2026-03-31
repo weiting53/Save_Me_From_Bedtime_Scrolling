@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>漸進亮度與灰階 · Gradual Dim & Grayscale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --gold: #c9a96e;
+      --gold-light: #e8d5a3;
+      --blue-deep: #050a1a;
+      --blue-mid: #0a1530;
+      --blue-accent: #1a2e5a;
+      --white-soft: #f0eee8;
+      --gray-muted: #8a8fa0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Serif TC', 'Cormorant Garamond', serif;
+      background: var(--blue-deep);
+      color: var(--white-soft);
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* ── STARFIELD ── */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── LANGUAGE TOGGLE ── */
+    .lang-toggle {
+      position: fixed;
+      top: 1.4rem;
+      right: 1.6rem;
+      z-index: 100;
+      display: flex;
+      gap: 0;
+      border: 1px solid rgba(201, 169, 110, 0.4);
+      border-radius: 2rem;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+    .lang-toggle button {
+      background: transparent;
+      border: none;
+      color: var(--gray-muted);
+      padding: 0.4rem 1rem;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      transition: all 0.3s;
+    }
+    .lang-toggle button.active {
+      background: var(--gold);
+      color: var(--blue-deep);
+      font-weight: 600;
+    }
+
+    /* ── LAYOUT ── */
+    .wrapper {
+      position: relative;
+      z-index: 10;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 6rem 1.5rem 4rem;
+    }
+
+    .moon-icon {
+      font-size: 4rem;
+      margin-bottom: 1.5rem;
+      animation: float 6s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(201,169,110,0.5));
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .hero-title-zh {
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #e8d5a3, #c9a96e, #f0eee8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.4rem;
+    }
+    .hero-title-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--gold);
+      letter-spacing: 0.2em;
+      margin-bottom: 2.5rem;
+      opacity: 0.85;
+    }
+
+    .hero-divider {
+      width: 60px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      margin: 0 auto 2.5rem;
+    }
+
+    .hero-tagline {
+      font-size: clamp(1rem, 2.2vw, 1.2rem);
+      font-weight: 300;
+      line-height: 1.8;
+      color: var(--white-soft);
+      max-width: 580px;
+      opacity: 0.88;
+    }
+
+    .cta-btn {
+      display: inline-block;
+      margin-top: 3rem;
+      padding: 1rem 2.8rem;
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-family: inherit;
+      font-size: 0.9rem;
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      text-transform: uppercase;
+      border-radius: 0.3rem;
+      transition: all 0.35s;
+      cursor: pointer;
+    }
+    .cta-btn:hover {
+      background: var(--gold);
+      color: var(--blue-deep);
+    }
+
+    .scroll-hint {
+      margin-top: 4rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      color: var(--gray-muted);
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+    /* ── SECTION COMMONS ── */
+    section {
+      padding: 6rem 0;
+    }
+
+    .section-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+    }
+    .section-title-zh {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      line-height: 1.3;
+      margin-bottom: 0.3rem;
+    }
+    .section-title-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(0.9rem, 2vw, 1.15rem);
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.7;
+      margin-bottom: 2.5rem;
+      letter-spacing: 0.12em;
+    }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-top: 3rem;
+    }
+    .feature-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(201,169,110,0.15);
+      border-radius: 1rem;
+      padding: 2rem 1.6rem;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .feature-card:hover {
+      border-color: rgba(201,169,110,0.4);
+      transform: translateY(-4px);
+    }
+    .feature-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .feature-title-zh {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.3rem;
+    }
+    .feature-title-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.82rem;
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.7;
+      margin-bottom: 0.9rem;
+    }
+    .feature-desc {
+      font-size: 0.88rem;
+      font-weight: 300;
+      line-height: 1.75;
+      color: rgba(240,238,232,0.75);
+    }
+
+    /* ── PHILOSOPHY ── */
+    .philosophy-box {
+      background: linear-gradient(135deg, rgba(201,169,110,0.06), rgba(26,46,90,0.3));
+      border: 1px solid rgba(201,169,110,0.2);
+      border-radius: 1.2rem;
+      padding: 3rem 2.5rem;
+      text-align: center;
+    }
+    .philosophy-quote {
+      font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+      font-weight: 300;
+      line-height: 1.9;
+      color: var(--white-soft);
+    }
+    .philosophy-quote em {
+      color: var(--gold-light);
+      font-style: italic;
+    }
+    .philosophy-en {
+      margin-top: 1.5rem;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(0.9rem, 2vw, 1.1rem);
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.65;
+      line-height: 1.8;
+    }
+
+    /* ── DOWNLOAD BTN ── */
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 1.6rem;
+      padding: 1rem 2.4rem;
+      background: linear-gradient(135deg, rgba(201,169,110,0.18), rgba(201,169,110,0.08));
+      border: 1px solid rgba(201,169,110,0.55);
+      border-radius: 3rem;
+      color: var(--gold-light);
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-decoration: none;
+      backdrop-filter: blur(8px);
+      transition: all 0.35s;
+    }
+    .download-btn:hover {
+      background: linear-gradient(135deg, rgba(201,169,110,0.35), rgba(201,169,110,0.15));
+      border-color: var(--gold);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(201,169,110,0.2);
+    }
+    .download-btn .btn-icon { font-size: 1.1rem; }
+
+    /* ── PATH CARD ── */
+    .path-card {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      width: 190px;
+      height: 220px;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(201,169,110,0.3);
+      background: linear-gradient(160deg, rgba(26,46,90,0.6), rgba(10,21,48,0.8));
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 1.2rem 1.4rem;
+      gap: 0;
+    }
+    .path-card-title {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+    }
+    .path-step {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .path-step-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--white-soft);
+      white-space: nowrap;
+    }
+    .path-step-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.68rem;
+      font-style: italic;
+      color: rgba(201,169,110,0.65);
+      white-space: nowrap;
+    }
+    .path-arrow-down {
+      font-size: 0.75rem;
+      color: rgba(201,169,110,0.4);
+      margin: 0.2rem 0 0.2rem 0.4rem;
+    }
+    .path-step-last .path-step-name {
+      color: var(--gold-light);
+    }
+    .path-card-caption {
+      margin-top: auto;
+      padding-top: 0.6rem;
+      font-size: 0.65rem;
+      color: rgba(201,169,110,0.5);
+      letter-spacing: 0.08em;
+    }
+
+    /* ── PREREQ SUBSECTION ── */
+    .prereq-subsection {
+      margin-top: 3.5rem;
+      padding-top: 3rem;
+      border-top: 1px solid rgba(201,169,110,0.12);
+    }
+    .prereq-sub-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.8rem;
+    }
+    .prereq-sub-title-zh {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      line-height: 1.35;
+      margin-bottom: 0.25rem;
+    }
+    .prereq-sub-title-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.65;
+      margin-bottom: 1.2rem;
+    }
+    .prereq-sub-desc {
+      font-size: 0.9rem;
+      font-weight: 300;
+      line-height: 1.85;
+      color: rgba(240,238,232,0.78);
+      max-width: 560px;
+      margin-bottom: 2rem;
+    }
+    .prereq-sub-desc strong { color: var(--gold-light); }
+    .acc-strip {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .acc-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+    }
+    .acc-item img {
+      width: 100%;
+      max-width: 200px;
+      border-radius: 1.5rem;
+      border: 1px solid rgba(201,169,110,0.15);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.55);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .acc-item img:hover {
+      transform: scale(1.04) translateY(-4px);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.65);
+    }
+    .acc-caption {
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 300;
+      color: rgba(240,238,232,0.65);
+      line-height: 1.4;
+    }
+    .acc-caption strong {
+      display: block;
+      font-weight: 600;
+      color: var(--white-soft);
+      font-size: 0.82rem;
+      margin-bottom: 0.2rem;
+    }
+    .acc-arrow {
+      color: rgba(201,169,110,0.35);
+      font-size: 1.4rem;
+      align-self: center;
+      margin-bottom: 2.5rem;
+      flex-shrink: 0;
+    }
+    .triple-click-tip {
+      margin-top: 2rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      background: rgba(201,169,110,0.06);
+      border: 1px solid rgba(201,169,110,0.18);
+      border-radius: 0.8rem;
+      padding: 1.2rem 1.4rem;
+    }
+    .triple-click-tip .tip-icon {
+      font-size: 1.6rem;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .triple-click-tip p {
+      font-size: 0.88rem;
+      font-weight: 300;
+      line-height: 1.8;
+      color: rgba(240,238,232,0.82);
+    }
+    .triple-click-tip strong { color: var(--gold-light); }
+    @media (max-width: 640px) {
+      .acc-strip { flex-wrap: wrap; }
+      .acc-item { flex: 0 0 calc(50% - 0.5rem); }
+      .acc-arrow { display: none; }
+    }
+
+    /* ── INSTALL FINISH ── */
+    .install-finish {
+      margin-top: 4rem;
+      text-align: center;
+      padding: 3rem 2rem;
+      background: linear-gradient(135deg, rgba(201,169,110,0.06), rgba(26,46,90,0.2));
+      border: 1px solid rgba(201,169,110,0.15);
+      border-radius: 1.5rem;
+    }
+    .install-finish-title {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.5rem;
+    }
+    .install-finish-sub {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1rem;
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.7;
+      margin-bottom: 2rem;
+    }
+
+    /* ── PREREQ STRIP ── */
+    .prereq-section {
+      padding: 5rem 0;
+    }
+    .prereq-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(201,169,110,0.1);
+      border: 1px solid rgba(201,169,110,0.3);
+      border-radius: 2rem;
+      padding: 0.35rem 1rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: var(--gold);
+      margin-bottom: 1.8rem;
+    }
+    .prereq-strip {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding-bottom: 1.2rem;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      margin-top: 2rem;
+      /* hide scrollbar but keep functionality */
+      scrollbar-width: thin;
+      scrollbar-color: rgba(201,169,110,0.3) transparent;
+    }
+    .prereq-strip::-webkit-scrollbar { height: 4px; }
+    .prereq-strip::-webkit-scrollbar-track { background: transparent; }
+    .prereq-strip::-webkit-scrollbar-thumb { background: rgba(201,169,110,0.3); border-radius: 2px; }
+
+    .prereq-item {
+      flex: 0 0 auto;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      width: 130px;
+    }
+    .prereq-item img {
+      width: 130px;
+      height: 220px;
+      object-fit: cover;
+      object-position: top;
+      border-radius: 1.2rem;
+      border: 1px solid rgba(201,169,110,0.15);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .prereq-item img:hover {
+      transform: scale(1.05) translateY(-3px);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.65);
+    }
+    .prereq-caption {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 300;
+      color: rgba(240,238,232,0.6);
+      line-height: 1.4;
+      letter-spacing: 0.04em;
+    }
+    .prereq-arrow {
+      color: rgba(201,169,110,0.35);
+      font-size: 1rem;
+      align-self: center;
+      margin-top: -2rem;
+      flex-shrink: 0;
+    }
+
+    /* ── INSTALLATION ── */
+    .install-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 4rem;
+      margin-top: 3rem;
+    }
+    .install-step {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+    .install-step.reverse { direction: rtl; }
+    .install-step.reverse > * { direction: ltr; }
+
+    .step-content {}
+    .step-number {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 4rem;
+      font-weight: 300;
+      color: rgba(201,169,110,0.2);
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+    .step-title-zh {
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.25rem;
+    }
+    .step-title-en {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 0.88rem;
+      font-style: italic;
+      color: var(--gold);
+      opacity: 0.7;
+      margin-bottom: 1rem;
+    }
+    .step-desc {
+      font-size: 0.9rem;
+      font-weight: 300;
+      line-height: 1.8;
+      color: rgba(240,238,232,0.78);
+    }
+
+    .step-image {
+      display: flex;
+      justify-content: center;
+    }
+    .step-image img {
+      width: 100%;
+      max-width: 220px;
+      border-radius: 2rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,169,110,0.15);
+      transition: transform 0.4s, box-shadow 0.4s;
+    }
+    .step-image img:hover {
+      transform: scale(1.03) translateY(-4px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,169,110,0.35);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      border-top: 1px solid rgba(201,169,110,0.1);
+    }
+    .footer-text {
+      font-size: 0.8rem;
+      color: var(--gray-muted);
+      letter-spacing: 0.1em;
+      line-height: 2;
+    }
+
+    /* ── SECTION DIVIDER ── */
+    .section-divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(201,169,110,0.25), transparent);
+      margin: 0 auto;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .install-step, .install-step.reverse {
+        grid-template-columns: 1fr;
+        direction: ltr;
+      }
+      .install-step.reverse { direction: ltr; }
+      .step-image { order: -1; }
+      .features-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── LANGUAGE VISIBILITY ── */
+    [data-lang="en"] { display: none; }
+    body.lang-en [data-lang="zh"] { display: none; }
+    body.lang-en [data-lang="en"] { display: block; }
+    body.lang-en .hero-title-zh,
+    body.lang-en .hero-tagline[data-zh] { display: none; }
+
+    /* elements that are always shown or toggled inline */
+    body.lang-en .show-zh { display: none; }
+    body.lang-en .show-en { display: block; }
+    .show-en { display: none; }
+    .show-zh { display: block; }
+
+    /* For inline elements, we need a separate rule */
+    span.show-en { display: none; }
+    span.show-zh { display: inline; }
+    body.lang-en span.show-en { display: inline; }
+    body.lang-en span.show-zh { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Language Toggle -->
+<div class="lang-toggle">
+  <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+  <button id="btn-en" onclick="setLang('en')">EN</button>
+</div>
+
+<!-- Starfield Canvas -->
+<canvas id="starfield"></canvas>
+
+<!-- ══ HERO ══ -->
+<section class="hero">
+  <div class="moon-icon">🌙</div>
+
+  <h1 class="hero-title-zh show-zh">漸進亮度與灰階</h1>
+  <h1 class="hero-title-zh show-en" style="font-size:clamp(1.8rem,5vw,3rem);">Gradual Dim &amp; Grayscale</h1>
+
+  <p class="hero-title-en show-zh">Gradual Dim &amp; Grayscale · iOS Shortcut</p>
+  <p class="hero-title-en show-en">漸進亮度與灰階 · iOS 捷徑</p>
+
+  <div class="hero-divider"></div>
+
+  <p class="hero-tagline">
+    <span class="show-zh">不是強迫，是引導。<br/>讓螢幕自然暗下來，讓你自然想放下手機。</span>
+    <span class="show-en">Not a restriction — a gentle nudge.<br/>Let your screen fade, and let yourself drift to sleep.</span>
+  </p>
+
+  <a class="download-btn" href="https://www.icloud.com/shortcuts/5d4ae7e9fec64d2abdbf6ec60e60fc7c" target="_blank" rel="noopener">
+    <span class="btn-icon">⬇</span>
+    <span class="show-zh">加入捷徑（iPhone）</span>
+    <span class="show-en">Add Shortcut (iPhone)</span>
+  </a>
+
+  <a class="cta-btn" href="#prereq" style="margin-top:1rem;">
+    <span class="show-zh">查看安裝說明</span>
+    <span class="show-en">View Setup Guide</span>
+  </a>
+  <p class="scroll-hint">
+    <span class="show-zh">▾ 向下捲動</span>
+    <span class="show-en">▾ Scroll Down</span>
+  </p>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ FEATURES ══ -->
+<section>
+  <div class="wrapper">
+    <p class="section-label show-zh">功能介紹</p>
+    <p class="section-label show-en">What It Does</p>
+
+    <h2 class="section-title-zh show-zh">讓螢幕自己「想辦法」讓你睡著</h2>
+    <h2 class="section-title-zh show-en">Your Screen Works With You, Not Against You</h2>
+
+    <p class="section-title-en show-zh">A sleep aid built into your iPhone</p>
+    <p class="section-title-en show-en">內建在 iPhone 裡的助眠工具</p>
+
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="feature-icon">🔅</div>
+        <div class="feature-title-zh show-zh">漸進降低亮度</div>
+        <div class="feature-title-zh show-en">Gradual Brightness Fade</div>
+        <div class="feature-title-en show-zh">Gradual Brightness Fade</div>
+        <div class="feature-title-en show-en">漸進降低亮度</div>
+        <p class="feature-desc">
+          <span class="show-zh">每隔一段時間自動調低一格亮度，讓眼睛慢慢適應，不會突然感覺螢幕消失。</span>
+          <span class="show-en">Brightness dims step by step over time, so your eyes adapt gradually without a jarring blackout.</span>
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⬜</div>
+        <div class="feature-title-zh show-zh">自動開啟灰階模式</div>
+        <div class="feature-title-zh show-en">Grayscale Mode On</div>
+        <div class="feature-title-en show-zh">Grayscale Mode On</div>
+        <div class="feature-title-en show-en">自動開啟灰階模式</div>
+        <p class="feature-desc">
+          <span class="show-zh">灰階讓 Instagram、YouTube 變得沒那麼吸引人，多巴胺刺激大幅降低，你自然不想繼續滑。</span>
+          <span class="show-en">Grayscale strips the color that makes Instagram and YouTube so addictive. Without the dopamine hit, you naturally stop scrolling.</span>
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⏰</div>
+        <div class="feature-title-zh show-zh">每天自動觸發</div>
+        <div class="feature-title-zh show-en">Daily Auto-Trigger</div>
+        <div class="feature-title-en show-zh">Daily Auto-Trigger</div>
+        <div class="feature-title-en show-en">每天自動觸發</div>
+        <p class="feature-desc">
+          <span class="show-zh">設定一次就完成，每晚 11:30 自動啟動，清晨 7:00 自動關閉，完全不需要記。</span>
+          <span class="show-en">Set it once. Every night at 11:30 PM it starts; at 7:00 AM it resets. Zero effort every day.</span>
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🕊️</div>
+        <div class="feature-title-zh show-zh">引導，而非限制</div>
+        <div class="feature-title-zh show-en">Guidance, Not Control</div>
+        <div class="feature-title-en show-zh">Guidance, Not Control</div>
+        <div class="feature-title-en show-en">引導，而非限制</div>
+        <p class="feature-desc">
+          <span class="show-zh">不鎖定任何 App，不強制你放下手機。只是讓環境變得「想睡覺」，決定權還在你手上。</span>
+          <span class="show-en">No app locks. No forced restrictions. The environment just becomes… sleepier. You're always in control.</span>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ PHILOSOPHY ══ -->
+<section>
+  <div class="wrapper">
+    <div class="philosophy-box">
+      <p class="philosophy-quote show-zh">
+        真正好的習慣，不是靠<em>意志力</em>撐住，<br/>
+        而是讓環境幫你<em>自然而然</em>地走向它。
+      </p>
+      <p class="philosophy-en show-zh">
+        Real habits aren't built on willpower.<br/>
+        They're built into the environment around you.
+      </p>
+
+      <p class="philosophy-quote show-en">
+        Real habits aren't built on <em>willpower</em>.<br/>
+        They're built into the <em>environment</em> around you.
+      </p>
+      <p class="philosophy-en show-en">
+        真正好的習慣，不是靠意志力撐住，<br/>
+        而是讓環境幫你自然而然地走向它。
+      </p>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ PREREQUISITE SETUP ══ -->
+<section class="prereq-section" id="prereq">
+  <div class="wrapper">
+    <div class="prereq-badge">
+      <span>⚙️</span>
+      <span class="show-zh">前置設定（一次性）</span>
+      <span class="show-en">One-Time Setup Required</span>
+    </div>
+
+    <h2 class="section-title-zh show-zh">先開啟「顏色濾鏡」權限</h2>
+    <h2 class="section-title-zh show-en">Enable Color Filters First</h2>
+
+    <p class="section-title-en show-zh">Enable Color Filters in Accessibility Settings</p>
+    <p class="section-title-en show-en">在輔助使用設定中開啟顏色濾鏡</p>
+
+    <p class="step-desc" style="max-width:560px;">
+      <span class="show-zh">捷徑要能控制灰階，你需要先在 <strong style="color:var(--gold-light)">設定 → 輔助使用</strong> 裡完成一次前置設定，讓 iPhone 知道可以用「顏色濾鏡」這個功能。只需要做一次，往後全自動。</span>
+      <span class="show-en">For the shortcut to control grayscale, you need to enable Color Filters in <strong style="color:var(--gold-light)">Settings → Accessibility</strong> once. After that, everything runs automatically.</span>
+    </p>
+
+    <div class="prereq-strip">
+
+      <!-- Path guide card (replaces 3 screenshots) -->
+      <div class="path-card">
+        <p class="path-card-title show-zh">進入路徑</p>
+        <p class="path-card-title show-en">How to get there</p>
+
+        <div class="path-step">
+          <span class="path-step-name show-zh">設定</span>
+          <span class="path-step-name show-en">Settings</span>
+          <span class="path-step-en show-zh">Settings</span>
+          <span class="path-step-en show-en">設定</span>
+        </div>
+        <div class="path-arrow-down">↓</div>
+        <div class="path-step">
+          <span class="path-step-name show-zh">輔助使用</span>
+          <span class="path-step-name show-en">Accessibility</span>
+          <span class="path-step-en show-zh">Accessibility</span>
+          <span class="path-step-en show-en">輔助使用</span>
+        </div>
+        <div class="path-arrow-down">↓</div>
+        <div class="path-step">
+          <span class="path-step-name show-zh">顯示與字體大小</span>
+          <span class="path-step-name show-en">Display &amp; Text Size</span>
+          <span class="path-step-en show-zh">Display &amp; Text Size</span>
+          <span class="path-step-en show-en">顯示與字體大小</span>
+        </div>
+        <div class="path-arrow-down">↓</div>
+        <div class="path-step path-step-last">
+          <span class="path-step-name show-zh">🎯 顏色濾鏡</span>
+          <span class="path-step-name show-en">🎯 Color Filters</span>
+          <span class="path-step-en show-zh">Color Filters</span>
+          <span class="path-step-en show-en">顏色濾鏡</span>
+        </div>
+      </div>
+
+      <div class="prereq-arrow">›</div>
+
+      <!-- pre5 = Color Filters OFF toggle (corrected order) -->
+      <div class="prereq-item">
+        <img src="images/pre5.png" alt="Color Filters toggle off" loading="lazy" />
+        <p class="prereq-caption">
+          <span class="show-zh">顏色濾鏡（關閉）</span>
+          <span class="show-en">Color Filters (off)</span>
+        </p>
+      </div>
+
+      <div class="prereq-arrow">›</div>
+
+      <!-- pre4 = Color Filters ON + Grayscale selected (corrected order) -->
+      <div class="prereq-item">
+        <img src="images/pre4.png" alt="Color Filters on, Grayscale selected" loading="lazy" />
+        <p class="prereq-caption">
+          <span class="show-zh">開啟 → 選灰階</span>
+          <span class="show-en">Enable → Grayscale</span>
+        </p>
+      </div>
+
+    </div>
+
+    <!-- ── SUBSECTION: Accessibility Shortcut (Side Button) ── -->
+    <div class="prereq-subsection">
+
+      <p class="prereq-sub-label">
+        <span>📱</span>
+        <span class="show-zh">同場加映・超重要前置工作</span>
+        <span class="show-en">Bonus · Critical One-Time Setup</span>
+      </p>
+
+      <h3 class="prereq-sub-title-zh show-zh">把「顏色濾鏡」加到側邊按鈕</h3>
+      <h3 class="prereq-sub-title-zh show-en">Add Color Filters to the Side Button</h3>
+      <p class="prereq-sub-title-en show-zh">Set up triple-click side button shortcut</p>
+      <p class="prereq-sub-title-en show-en">設定三連按側邊按鈕快速切換</p>
+
+      <p class="prereq-sub-desc">
+        <span class="show-zh">
+          完成後，你可以<strong>快速連按三下側邊按鈕</strong>來手動開關灰階，不需要進入設定。這在你睡前手動啟動、或早上想快速關掉時超好用。<br/><br/>
+          路徑：<strong>設定 → 輔助使用 → 輔助使用捷徑</strong>，然後勾選「顏色濾鏡」。
+        </span>
+        <span class="show-en">
+          Once configured, you can <strong>triple-click the side button</strong> to instantly toggle grayscale on or off — no need to open Settings. Perfect for a quick manual override before bed or in the morning.<br/><br/>
+          Path: <strong>Settings → Accessibility → Accessibility Shortcut</strong>, then check "Color Filters".
+        </span>
+      </p>
+
+      <div class="acc-strip">
+
+        <div class="acc-item">
+          <img src="images/acc1.png" alt="Settings app with Accessibility" loading="lazy" />
+          <div class="acc-caption">
+            <strong>
+              <span class="show-zh">① 設定</span>
+              <span class="show-en">① Settings</span>
+            </strong>
+            <span class="show-zh">找到「輔助使用」</span>
+            <span class="show-en">Open Accessibility</span>
+          </div>
+        </div>
+
+        <div class="acc-arrow">›</div>
+
+        <div class="acc-item">
+          <img src="images/acc2.png" alt="Accessibility page showing Accessibility Shortcut" loading="lazy" />
+          <div class="acc-caption">
+            <strong>
+              <span class="show-zh">② 輔助使用</span>
+              <span class="show-en">② Accessibility</span>
+            </strong>
+            <span class="show-zh">捲到底，點「輔助使用捷徑」</span>
+            <span class="show-en">Scroll down, tap "Accessibility Shortcut"</span>
+          </div>
+        </div>
+
+        <div class="acc-arrow">›</div>
+
+        <div class="acc-item">
+          <img src="images/acc3.png" alt="Accessibility Shortcut list with Color Filters checked" loading="lazy" />
+          <div class="acc-caption">
+            <strong>
+              <span class="show-zh">③ 勾選「顏色濾鏡」</span>
+              <span class="show-en">③ Check "Color Filters"</span>
+            </strong>
+            <span class="show-zh">打勾後即完成設定</span>
+            <span class="show-en">Check the box and you're done</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="triple-click-tip">
+        <span class="tip-icon">⚡</span>
+        <p>
+          <span class="show-zh">設定完成後，<strong>連按三下 iPhone 側邊按鈕</strong>就能即時切換灰階模式。睡前手動開、早上手動關，完全掌控在你手上。</span>
+          <span class="show-en">Once set up, <strong>triple-click the iPhone side button</strong> to instantly toggle grayscale. Turn it on before bed, off in the morning — always in your hands.</span>
+        </p>
+      </div>
+
+    </div><!-- end prereq-subsection -->
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ INSTALLATION ══ -->
+<section id="install">
+  <div class="wrapper">
+    <p class="section-label show-zh">安裝指引</p>
+    <p class="section-label show-en">Installation Guide</p>
+
+    <h2 class="section-title-zh show-zh">五步驟完成設定</h2>
+    <h2 class="section-title-zh show-en">Set Up in Five Steps</h2>
+
+    <p class="section-title-en show-zh">Set up in five steps · iPhone only</p>
+    <p class="section-title-en show-en">只需五個步驟 · 僅支援 iPhone</p>
+
+    <div class="install-steps">
+
+      <!-- Step 1 -->
+      <div class="install-step">
+        <div class="step-content">
+          <div class="step-number">01</div>
+          <div class="step-title-zh show-zh">打開捷徑 App，找到「漸進亮度與灰階」</div>
+          <div class="step-title-zh show-en">Open Shortcuts, find the shortcut</div>
+          <div class="step-title-en show-zh">Open Shortcuts App</div>
+          <div class="step-title-en show-en">打開捷徑 App</div>
+          <p class="step-desc">
+            <span class="show-zh">在「Starter Shortcuts」區塊找到「漸進亮度與灰階」，或透過搜尋找到它。點進去查看詳細內容。</span>
+            <span class="show-en">In the Shortcuts App, find "漸進亮度與灰階" under Starter Shortcuts, or use search. Tap to open the shortcut details.</span>
+          </p>
+        </div>
+        <div class="step-image">
+          <img src="images/step1.png" alt="Shortcuts App showing the shortcut in gallery" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="install-step reverse">
+        <div class="step-content">
+          <div class="step-number">02</div>
+          <div class="step-title-zh show-zh">點擊「加入捷徑」</div>
+          <div class="step-title-zh show-en">Tap "Add Shortcut"</div>
+          <div class="step-title-en show-zh">Add the Shortcut</div>
+          <div class="step-title-en show-en">加入捷徑</div>
+          <p class="step-desc">
+            <span class="show-zh">在捷徑詳細頁面，點擊底部藍色的「加入捷徑」按鈕，將它加入你的捷徑庫。</span>
+            <span class="show-en">On the shortcut detail page, tap the blue "Add Shortcut" button at the bottom to add it to your library.</span>
+          </p>
+        </div>
+        <div class="step-image">
+          <img src="images/step2.png" alt="Add Shortcut button" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="install-step">
+        <div class="step-content">
+          <div class="step-number">03</div>
+          <div class="step-title-zh show-zh">前往「自動化」分頁，查看已設定的排程</div>
+          <div class="step-title-zh show-en">Go to "Automation" tab to verify schedules</div>
+          <div class="step-title-en show-zh">Check Automation</div>
+          <div class="step-title-en show-en">確認自動化設定</div>
+          <p class="step-desc">
+            <span class="show-zh">在捷徑 App 底部切換到「自動化」頁籤，確認有看到兩個排程：晚上 11:30（啟動）與清晨 7:00（關閉）。</span>
+            <span class="show-en">Switch to the "Automation" tab at the bottom of Shortcuts. You should see two schedules: 11:30 PM (activate) and 7:00 AM (deactivate).</span>
+          </p>
+        </div>
+        <div class="step-image">
+          <img src="images/step3.png" alt="Automation list with both schedules" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="install-step reverse">
+        <div class="step-content">
+          <div class="step-number">04</div>
+          <div class="step-title-zh show-zh">確認觸發時間與「立即執行」選項</div>
+          <div class="step-title-zh show-en">Confirm trigger time and "Run Immediately"</div>
+          <div class="step-title-en show-zh">Configure Settings</div>
+          <div class="step-title-en show-en">設定細節</div>
+          <p class="step-desc">
+            <span class="show-zh">點入晚上 11:30 的自動化，確認時間設為每天重複，並將執行模式設為「立即執行」，這樣就不需要每次手動確認。</span>
+            <span class="show-en">Tap the 11:30 PM automation. Make sure it repeats daily and set execution to "Run Immediately" so you don't need to confirm each time.</span>
+          </p>
+        </div>
+        <div class="step-image">
+          <img src="images/step4.png" alt="Automation settings with time picker" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="install-step">
+        <div class="step-content">
+          <div class="step-number">05</div>
+          <div class="step-title-zh show-zh">完成！每天晚上自動幫你準備睡覺</div>
+          <div class="step-title-zh show-en">Done! It runs every night automatically</div>
+          <div class="step-title-en show-zh">All Set!</div>
+          <div class="step-title-en show-en">大功告成！</div>
+          <p class="step-desc">
+            <span class="show-zh">設定完成後，每晚 11:30 你的 iPhone 會自動開啟灰階模式並漸漸降低亮度，早上 7:00 自動恢復正常。你只需要放下手機，閉上眼睛。</span>
+            <span class="show-en">Once set up, every night at 11:30 PM your iPhone will automatically enable grayscale and gradually dim the screen. At 7:00 AM it resets. Just close your eyes.</span>
+          </p>
+        </div>
+        <div class="step-image">
+          <img src="images/step5.png" alt="Personal automation options" loading="lazy" />
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Install Finish Block -->
+    <div class="install-finish">
+      <p class="install-finish-title">
+        <span class="show-zh">🌙 全部完成，晚安。</span>
+        <span class="show-en">🌙 All done. Sleep well.</span>
+      </p>
+      <p class="install-finish-sub">
+        <span class="show-zh">設定只需一次，效果每晚都在。</span>
+        <span class="show-en">Set up once. Enjoy every night.</span>
+      </p>
+      <a class="download-btn" href="https://www.icloud.com/shortcuts/5d4ae7e9fec64d2abdbf6ec60e60fc7c" target="_blank" rel="noopener">
+        <span class="btn-icon">⬇</span>
+        <span class="show-zh">立即加入捷徑（iPhone）</span>
+        <span class="show-en">Add Shortcut Now (iPhone)</span>
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<div class="section-divider"></div>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="wrapper">
+    <p class="footer-text">
+      <span class="show-zh">🌙 漸進亮度與灰階 · 用科技幫助你離開科技<br/>Made with ♡ for better sleep · 僅供 iOS / iPhone 使用</span>
+      <span class="show-en">🌙 Gradual Dim &amp; Grayscale · Using tech to help you step away from tech<br/>Made with ♡ for better sleep · iOS / iPhone only</span>
+    </p>
+  </div>
+</footer>
+
+<script>
+// ── STARFIELD ──
+(function() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  let W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function initStars() {
+    stars = [];
+    const count = Math.floor((W * H) / 3500);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.4 + 0.2,
+        alpha: Math.random(),
+        speed: Math.random() * 0.004 + 0.001,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+    // A few larger "glow" stars
+    for (let i = 0; i < 12; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 2.5 + 1.5,
+        alpha: Math.random() * 0.6 + 0.3,
+        speed: Math.random() * 0.002 + 0.0005,
+        phase: Math.random() * Math.PI * 2,
+        glow: true,
+      });
+    }
+  }
+  initStars();
+  window.addEventListener('resize', initStars);
+
+  // Nebula gradient — painted once each frame (cheap)
+  function drawNebula() {
+    const grd = ctx.createRadialGradient(W * 0.3, H * 0.25, 0, W * 0.3, H * 0.25, W * 0.55);
+    grd.addColorStop(0, 'rgba(20,35,90,0.18)');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    const grd2 = ctx.createRadialGradient(W * 0.78, H * 0.65, 0, W * 0.78, H * 0.65, W * 0.4);
+    grd2.addColorStop(0, 'rgba(60,20,80,0.12)');
+    grd2.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd2;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  let t = 0;
+  function animate() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Deep sky gradient background
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#050a1a');
+    sky.addColorStop(0.5, '#070e22');
+    sky.addColorStop(1, '#0a1530');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    drawNebula();
+
+    t += 0.016;
+    stars.forEach(s => {
+      const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * s.speed * 60 + s.phase));
+      ctx.save();
+      if (s.glow) {
+        const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+        g.addColorStop(0, `rgba(220,210,180,${alpha * s.alpha})`);
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = alpha * s.alpha;
+      ctx.fillStyle = '#e8d5b8';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ── LANGUAGE TOGGLE ──
+function setLang(lang) {
+  document.body.classList.toggle('lang-en', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  localStorage.setItem('lang', lang);
+}
+
+// Restore saved lang
+(function() {
+  const saved = localStorage.getItem('lang');
+  if (saved === 'en') setLang('en');
+})();
+</script>
+
+</body>
+</html>
