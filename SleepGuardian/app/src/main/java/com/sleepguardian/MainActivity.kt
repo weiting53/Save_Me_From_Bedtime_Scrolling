@@ -61,11 +61,9 @@ class MainActivity : AppCompatActivity() {
         updateSleepTimeDisplay()
         updateWakeTimeDisplay()
 
-        tvSleepTime.setOnClickListener                        { showSleepTimePicker() }
-        findViewById<Button>(R.id.btn_pick_time).setOnClickListener { showSleepTimePicker() }
-
-        tvWakeTime.setOnClickListener                              { showWakeTimePicker() }
-        findViewById<Button>(R.id.btn_pick_wake_time).setOnClickListener { showWakeTimePicker() }
+        // 點擊整個時間區域（數字 + 編輯圖示）皆可觸發選擇器
+        findViewById<android.view.View>(R.id.time_sleep_area).setOnClickListener { showSleepTimePicker() }
+        findViewById<android.view.View>(R.id.time_wake_area).setOnClickListener  { showWakeTimePicker() }
 
         btnStart.setOnClickListener { checkPermissionsAndStart() }
         btnStop.setOnClickListener  { stopGuardian() }
