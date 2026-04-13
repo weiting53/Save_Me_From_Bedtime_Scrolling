@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#060a14"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="40dp">
+
+        <!-- App 名稱 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="睡眠引導"
+            android:textColor="#3d4458"
+            android:textSize="11sp"
+            android:letterSpacing="0.2"
+            android:layout_marginBottom="40dp" />
+
+        <!-- ════ 睡覺時間區 ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="預計睡覺時間"
+            android:textColor="#5c6070"
+            android:textSize="12sp"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/tv_sleep_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="23:00"
+            android:textColor="#ddd9cc"
+            android:textSize="72sp"
+            android:fontFamily="sans-serif-thin"
+            android:letterSpacing="-0.02"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_pick_time"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="設定時間"
+            android:textSize="12sp"
+            android:textColor="#b8956a"
+            android:backgroundTint="#0d1526"
+            android:strokeColor="#2a3050"
+            android:strokeWidth="1dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="28dp"
+            android:paddingHorizontal="20dp" />
+
+        <!-- 分隔線 -->
+        <View
+            android:layout_width="120dp"
+            android:layout_height="1dp"
+            android:background="#1a2035"
+            android:layout_marginBottom="28dp" />
+
+        <!-- ════ 起床時間區 ════ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="自動關閉時間（早上）"
+            android:textColor="#5c6070"
+            android:textSize="12sp"
+            android:letterSpacing="0.08"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/tv_wake_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="05:00"
+            android:textColor="#8a8fa0"
+            android:textSize="48sp"
+            android:fontFamily="sans-serif-thin"
+            android:letterSpacing="-0.02"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <Button
+            android:id="@+id/btn_pick_wake_time"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="設定起床時間"
+            android:textSize="12sp"
+            android:textColor="#5c6a88"
+            android:backgroundTint="#0d1526"
+            android:strokeColor="#1a2035"
+            android:strokeWidth="1dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="32dp"
+            android:paddingHorizontal="20dp" />
+
+        <!-- ════ 狀態區 ════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#0c1220"
+            android:padding="20dp"
+            android:layout_marginBottom="32dp">
+
+            <TextView
+                android:id="@+id/tv_phase"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="尚未啟動"
+                android:textColor="#b8956a"
+                android:textSize="14sp"
+                android:letterSpacing="0.04"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tv_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="點「開始引導」讓引導在背景運行"
+                android:textColor="#5c6070"
+                android:textSize="12sp"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.4" />
+
+        </LinearLayout>
+
+        <!-- 開始按鈕 -->
+        <Button
+            android:id="@+id/btn_start"
+            android:layout_width="200dp"
+            android:layout_height="52dp"
+            android:text="開始引導"
+            android:textSize="15sp"
+            android:textColor="#060a14"
+            android:backgroundTint="#b8956a"
+            android:layout_marginBottom="12dp" />
+
+        <!-- 停止按鈕 -->
+        <Button
+            android:id="@+id/btn_stop"
+            android:layout_width="200dp"
+            android:layout_height="44dp"
+            android:text="停止引導"
+            android:textSize="13sp"
+            android:textColor="#8a8fa0"
+            android:backgroundTint="#0d1526"
+            android:strokeColor="#2a3050"
+            android:strokeWidth="1dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:enabled="false" />
+
+    </LinearLayout>
+</ScrollView>
