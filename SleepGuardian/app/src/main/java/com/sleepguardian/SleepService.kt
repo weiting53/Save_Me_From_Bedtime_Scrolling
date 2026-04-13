@@ -4,6 +4,8 @@ import android.app.*
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
+import android.net.VpnService
 import android.os.*
 import android.provider.Settings
 import android.view.View
@@ -35,6 +37,13 @@ class SleepService : Service() {
         const val KEY_WAKE_MINUTE  = "wake_minute"
         const val KEY_WAKE_TIME    = "wake_time_millis"
         const val EXTRA_WAKE_TIME  = "wake_time_millis"
+        const val KEY_MODE         = "guardian_mode"
+        const val EXTRA_MODE       = "guardian_mode"
+
+        const val MODE_BUNDLE         = 0
+        const val MODE_DIM_GRAY_ONLY  = 1
+        const val MODE_NETWORK_ONLY   = 2
+        const val MODE_REFRESH_ONLY   = 3
 
         const val DIM_START_MIN    = 3.0
         const val DIM_STEP_PCT     = 3         // 每次降低 3%
@@ -45,6 +54,14 @@ class SleepService : Service() {
         const val GRAY_INTERVAL_MIN = 3.0
         // 灰階進程：每 3 分鐘遞進，0→20→40→60→80→100%
         val GRAY_LEVELS = intArrayOf(20, 40, 60, 80, 100)
+
+        const val NET_START_MIN    = 10.0
+        const val NET_INTERVAL_MIN = 3.0
+        val NET_SPEED_LEVELS_KBPS = intArrayOf(2500, 1800, 1300, 900, 700, 500)
+
+        const val REFRESH_START_MIN = 10.0
+        const val REFRESH_INTERVAL_MIN = 8.0
+        val REFRESH_LEVELS_HZ = floatArrayOf(90f, 60f)
 
         const val CHANNEL_ID = "sleep_guardian_channel"
 
@@ -59,6 +76,11 @@ class SleepService : Service() {
     private var sleepTimeMillis = 0L
     private var wakeTimeMillis  = 0L     // 早上自動關閉的時間點
     private var originalBrightness = -1  // 記錄原始亮度，停止時恢復
+    private var selectedMode = MODE_BUNDLE
+    private var currentNetCapKbps: Int? = null
+    private var currentRefreshRateHz: Float? = null
+    private var originalPeakRefreshRate: Float? = null
+    private var originalMinRefreshRate: Float? = null
 
     // ────────────────────────────────────────────
     // 每 30 秒執行一次的 tick
@@ -88,11 +110,14 @@ class SleepService : Service() {
 
         wakeTimeMillis = intent?.getLongExtra(EXTRA_WAKE_TIME, 0L)
             ?: prefs.getLong(KEY_WAKE_TIME, 0L)
+        selectedMode = intent?.getIntExtra(EXTRA_MODE, MODE_BUNDLE)
+            ?: prefs.getInt(KEY_MODE, MODE_BUNDLE)
 
         // 持久化，讓服務被 START_STICKY 重啟後也能讀到
         prefs.edit()
             .putLong(KEY_SLEEP_TIME, sleepTimeMillis)
             .putLong(KEY_WAKE_TIME, wakeTimeMillis)
+            .putInt(KEY_MODE, selectedMode)
             .apply()
 
         // 記錄原始亮度（僅記一次）
@@ -101,6 +126,7 @@ class SleepService : Service() {
                 contentResolver, Settings.System.SCREEN_BRIGHTNESS, 200
             )
         }
+        captureOriginalRefreshSettingsIfNeeded()
 
         startForeground(1, buildNotification("睡眠引導中", "背景監控中，等待睡覺時間…"))
 
@@ -120,6 +146,8 @@ class SleepService : Service() {
 
         // 嘗試恢復系統亮度
         restoreBrightness()
+        resetNetworkThrottle()
+        restoreRefreshRate()
 
         // 關閉系統灰階（若有成功啟用）
         trySetSystemGrayscale(false)
@@ -153,37 +181,182 @@ class SleepService : Service() {
 
             // 睡覺時間已到，但還沒開始降亮（T+0 ~ T+3）
             diffMin < DIM_START_MIN -> {
+                applyRefreshRateByTimeline(diffMin)
                 phase      = "就寢時刻"
                 noticeText = "睡覺時間到了，放鬆一下 ✨"
             }
 
             // T+3 以後：開始降低系統亮度
             diffMin < GRAY_START_MIN -> {
-                // +1 讓第一步在 T+3 立刻生效（而非等到 T+6）
-                val steps   = ((diffMin - DIM_START_MIN) / DIM_INTERVAL_MIN).toInt() + 1
-                val dimPct  = (steps * DIM_STEP_PCT).coerceAtMost(DIM_MAX_PCT)
-                applyBrightnessDim(dimPct)
+                val dimPct = calcDimPct(diffMin)
+                applyBrightnessAndGrayscale(diffMin, dimPct)
+                applyNetworkThrottleByTimeline(diffMin)
+                applyRefreshRateByTimeline(diffMin)
                 phase      = "漸暗模式"
-                noticeText  = "亮度已降低 $dimPct%"
+                noticeText  = buildStatusText(dimPct, null, currentNetCapKbps, currentRefreshRateHz)
             }
 
             // T+15 以後：亮度繼續降，同時開始灰階
             else -> {
-                val dimSteps  = ((diffMin - DIM_START_MIN)  / DIM_INTERVAL_MIN).toInt() + 1
-                val graySteps = ((diffMin - GRAY_START_MIN) / GRAY_INTERVAL_MIN).toInt()
-                val dimPct    = (dimSteps * DIM_STEP_PCT).coerceAtMost(DIM_MAX_PCT)
-                val grayIdx   = graySteps.coerceAtMost(GRAY_LEVELS.size - 1)
-                val grayPct   = GRAY_LEVELS[grayIdx]
-
-                applyBrightnessDim(dimPct)
-                applyGrayscale(grayPct)
+                val dimPct  = calcDimPct(diffMin)
+                val grayPct = calcGrayPct(diffMin)
+                applyBrightnessAndGrayscale(diffMin, dimPct)
+                applyNetworkThrottleByTimeline(diffMin)
+                applyRefreshRateByTimeline(diffMin)
 
                 phase      = "灰階模式"
-                noticeText  = "亮度 -$dimPct%  ·  灰階 $grayPct%"
+                noticeText  = buildStatusText(dimPct, grayPct, currentNetCapKbps, currentRefreshRateHz)
             }
         }
 
         updateNotification(phase, noticeText)
+    }
+
+    private fun calcDimPct(diffMin: Double): Int {
+        val steps = ((diffMin - DIM_START_MIN) / DIM_INTERVAL_MIN).toInt() + 1
+        return (steps * DIM_STEP_PCT).coerceAtMost(DIM_MAX_PCT)
+    }
+
+    private fun calcGrayPct(diffMin: Double): Int? {
+        if (diffMin < GRAY_START_MIN) return null
+        val graySteps = ((diffMin - GRAY_START_MIN) / GRAY_INTERVAL_MIN).toInt()
+        val grayIdx   = graySteps.coerceAtMost(GRAY_LEVELS.size - 1)
+        return GRAY_LEVELS[grayIdx]
+    }
+
+    private fun buildStatusText(dimPct: Int?, grayPct: Int?, speedKbps: Int?, refreshHz: Float?): String {
+        val parts = mutableListOf<String>()
+        dimPct?.let { parts += "亮度 -$it%" }
+        grayPct?.let { parts += "灰階 $it%" }
+        speedKbps?.let { parts += "網速上限約 ${it}kbps" }
+        refreshHz?.let { parts += "更新率 ${it.toInt()}Hz" }
+        return if (parts.isEmpty()) "睡前緩衝中" else parts.joinToString("  ·  ")
+    }
+
+    private fun applyBrightnessAndGrayscale(diffMin: Double, dimPct: Int) {
+        if (selectedMode == MODE_NETWORK_ONLY || selectedMode == MODE_REFRESH_ONLY) {
+            applyGrayscale(0)
+            return
+        }
+        applyBrightnessDim(dimPct)
+        val grayPct = calcGrayPct(diffMin) ?: 0
+        applyGrayscale(grayPct)
+    }
+
+    /**
+     * Android 原生無公開 API 可直接全系統限速；這裡先以可替換介面封裝，
+     * 後續可改接 VPNService 做真正封包級節流。
+     */
+    private fun applyNetworkThrottleByTimeline(diffMin: Double) {
+        if (selectedMode == MODE_DIM_GRAY_ONLY) {
+            resetNetworkThrottle()
+            return
+        }
+        if (diffMin < NET_START_MIN) {
+            resetNetworkThrottle()
+            return
+        }
+        val netSteps = ((diffMin - NET_START_MIN) / NET_INTERVAL_MIN).toInt()
+        val netIdx = netSteps.coerceAtMost(NET_SPEED_LEVELS_KBPS.size - 1)
+        applyNetworkThrottle(NET_SPEED_LEVELS_KBPS[netIdx])
+    }
+
+    private fun applyNetworkThrottle(targetKbps: Int) {
+        val capped = targetKbps.coerceAtLeast(500)
+        currentNetCapKbps = capped
+        if (VpnService.prepare(this) != null) return
+        val intent = Intent(this, PulseThrottleVpnService::class.java).apply {
+            action = PulseThrottleVpnService.ACTION_START_OR_UPDATE
+            putExtra(PulseThrottleVpnService.EXTRA_TARGET_KBPS, capped)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
+    private fun resetNetworkThrottle() {
+        currentNetCapKbps = null
+        val intent = Intent(this, PulseThrottleVpnService::class.java).apply {
+            action = PulseThrottleVpnService.ACTION_STOP
+        }
+        startService(intent)
+    }
+
+    private fun applyRefreshRateByTimeline(diffMin: Double) {
+        if (selectedMode != MODE_BUNDLE && selectedMode != MODE_REFRESH_ONLY) {
+            restoreRefreshRate()
+            return
+        }
+        if (diffMin < REFRESH_START_MIN) {
+            restoreRefreshRate()
+            return
+        }
+        val steps = ((diffMin - REFRESH_START_MIN) / REFRESH_INTERVAL_MIN).toInt()
+        val idx = steps.coerceAtMost(REFRESH_LEVELS_HZ.size - 1)
+        applyRefreshRate(REFRESH_LEVELS_HZ[idx])
+    }
+
+    private fun applyRefreshRate(targetHz: Float) {
+        if (!Settings.System.canWrite(this)) {
+            currentRefreshRateHz = null
+            return
+        }
+        val supportedHz = resolveSupportedRefreshRate(targetHz)
+        val ok = setSystemRefreshRate(supportedHz)
+        currentRefreshRateHz = if (ok) supportedHz else null
+    }
+
+    private fun captureOriginalRefreshSettingsIfNeeded() {
+        if (!Settings.System.canWrite(this)) return
+        if (originalPeakRefreshRate != null || originalMinRefreshRate != null) return
+        originalPeakRefreshRate = try {
+            Settings.System.getFloat(contentResolver, "peak_refresh_rate")
+        } catch (_: Settings.SettingNotFoundException) {
+            null
+        }
+        originalMinRefreshRate = try {
+            Settings.System.getFloat(contentResolver, "min_refresh_rate")
+        } catch (_: Settings.SettingNotFoundException) {
+            null
+        }
+    }
+
+    private fun setSystemRefreshRate(targetHz: Float): Boolean {
+        return try {
+            Settings.System.putFloat(contentResolver, "peak_refresh_rate", targetHz)
+            Settings.System.putFloat(contentResolver, "min_refresh_rate", 60f)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun restoreRefreshRate() {
+        currentRefreshRateHz = null
+        if (!Settings.System.canWrite(this)) return
+        try {
+            originalPeakRefreshRate?.let {
+                Settings.System.putFloat(contentResolver, "peak_refresh_rate", it)
+            }
+            originalMinRefreshRate?.let {
+                Settings.System.putFloat(contentResolver, "min_refresh_rate", it)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun resolveSupportedRefreshRate(targetHz: Float): Float {
+        val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
+        val display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY) ?: return targetHz
+        val rates = display.supportedModes
+            .map { it.refreshRate }
+            .filter { it >= 60f }
+            .distinct()
+            .sortedDescending()
+        if (rates.isEmpty()) return targetHz.coerceAtLeast(60f)
+        return rates.firstOrNull { it <= targetHz } ?: rates.last()
     }
 
     // ────────────────────────────────────────────

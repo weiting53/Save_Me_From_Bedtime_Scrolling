@@ -88,6 +88,23 @@
                     android:paddingBottom="10dp" />
             </LinearLayout>
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="勸 睡 模 式"
+                android:textColor="#3d4e62"
+                android:textSize="10sp"
+                android:letterSpacing="0.22"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="4dp" />
+
+            <Spinner
+                android:id="@+id/sp_mode"
+                android:layout_width="220dp"
+                android:layout_height="wrap_content"
+                android:backgroundTint="#1e2b3d"
+                android:popupBackground="#0c1322" />
+
             <!-- ── 裝飾分隔線 ── -->
             <LinearLayout
                 android:layout_width="match_parent"

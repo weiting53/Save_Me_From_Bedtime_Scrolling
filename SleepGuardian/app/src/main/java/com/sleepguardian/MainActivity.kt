@@ -3,10 +3,15 @@ package com.sleepguardian
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
+import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private var selectedMinute = 0
     private var wakeHour       = 5    // 預設起床時間 05:00
     private var wakeMinute     = 0
+    private var selectedMode   = SleepService.MODE_BUNDLE
 
     private val overlayLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -32,6 +38,16 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { attemptStart() }
 
+    private val vpnLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            attemptStart()
+        } else {
+            tvStatus.text = "❌ 需要 VPN 權限才能使用降網速模式"
+        }
+    }
+
     // ── 元素
     private lateinit var tvSleepTime: TextView
     private lateinit var tvWakeTime:  TextView
@@ -39,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStart:    Button
     private lateinit var btnStop:     Button
     private lateinit var tvPhase:     TextView
+    private lateinit var spMode:      Spinner
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +67,7 @@ class MainActivity : AppCompatActivity() {
         btnStart    = findViewById(R.id.btn_start)
         btnStop     = findViewById(R.id.btn_stop)
         tvPhase     = findViewById(R.id.tv_phase)
+        spMode      = findViewById(R.id.sp_mode)
 
         // 從 SharedPreferences 讀取上次設定
         val prefs = getSharedPreferences(SleepService.PREFS, MODE_PRIVATE)
@@ -57,9 +75,11 @@ class MainActivity : AppCompatActivity() {
         selectedMinute = prefs.getInt(SleepService.KEY_MINUTE,        0)
         wakeHour       = prefs.getInt(SleepService.KEY_WAKE_HOUR,     5)
         wakeMinute     = prefs.getInt(SleepService.KEY_WAKE_MINUTE,   0)
+        selectedMode   = prefs.getInt(SleepService.KEY_MODE, SleepService.MODE_BUNDLE)
 
         updateSleepTimeDisplay()
         updateWakeTimeDisplay()
+        setupModeSpinner()
 
         // 點擊整個時間區域（數字 + 編輯圖示）皆可觸發選擇器
         findViewById<android.view.View>(R.id.time_sleep_area).setOnClickListener { showSleepTimePicker() }
@@ -108,6 +128,29 @@ class MainActivity : AppCompatActivity() {
         tvWakeTime.text = String.format("%02d:%02d", wakeHour, wakeMinute)
     }
 
+    private fun setupModeSpinner() {
+        val options = listOf(
+            "組合包（亮度＋灰階＋降網速＋降更新率）",
+            "各自功能：亮度＋灰階",
+            "各自功能：僅降網速",
+            "各自功能：僅降更新率"
+        )
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, options).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spMode.adapter = adapter
+        spMode.setSelection(selectedMode.coerceIn(0, options.lastIndex), false)
+        spMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                selectedMode = position
+                getSharedPreferences(SleepService.PREFS, MODE_PRIVATE).edit()
+                    .putInt(SleepService.KEY_MODE, selectedMode)
+                    .apply()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+    }
+
     // ── 依序檢查所有必要權限
     private fun checkPermissionsAndStart() {
         if (!Settings.canDrawOverlays(this)) {
@@ -133,7 +176,19 @@ class MainActivity : AppCompatActivity() {
                 return
             }
         }
+        if (requiresNetworkThrottle(selectedMode)) {
+            val prepareIntent = VpnService.prepare(this)
+            if (prepareIntent != null) {
+                Toast.makeText(this, "請允許 VPN 權限以啟用降網速", Toast.LENGTH_LONG).show()
+                vpnLauncher.launch(prepareIntent)
+                return
+            }
+        }
         attemptStart()
+    }
+
+    private fun requiresNetworkThrottle(mode: Int): Boolean {
+        return mode == SleepService.MODE_BUNDLE || mode == SleepService.MODE_NETWORK_ONLY
     }
 
     // ── 所有權限就緒後啟動服務
@@ -173,6 +228,7 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, SleepService::class.java).apply {
             putExtra(SleepService.EXTRA_SLEEP_TIME, sleepTarget.timeInMillis)
             putExtra(SleepService.EXTRA_WAKE_TIME,  wakeTarget.timeInMillis)
+            putExtra(SleepService.EXTRA_MODE, selectedMode)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -211,12 +267,19 @@ class MainActivity : AppCompatActivity() {
                 else                                         -> "灰階模式進行中"
             }
 
+            val modeText = when (prefs.getInt(SleepService.KEY_MODE, SleepService.MODE_BUNDLE)) {
+                SleepService.MODE_DIM_GRAY_ONLY -> "（各自功能：亮度＋灰階）"
+                SleepService.MODE_NETWORK_ONLY -> "（各自功能：僅降網速）"
+                SleepService.MODE_REFRESH_ONLY -> "（各自功能：僅降更新率）"
+                else -> "（組合包）"
+            }
+
             val wakeStr = if (wakeMillis > 0) {
                 val cal = Calendar.getInstance().apply { timeInMillis = wakeMillis }
                 String.format("，%02d:%02d 自動關閉", cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
             } else ""
 
-            tvStatus.text = "✅ 睡眠引導背景執行中$wakeStr"
+            tvStatus.text = "✅ 睡眠引導背景執行中$wakeStr $modeText"
         } else {
             tvPhase.text  = "尚未啟動"
             tvStatus.text = "點「開始引導」讓引導在背景運行"
