@@ -60,8 +60,9 @@ class SleepService : Service() {
         val NET_SPEED_LEVELS_KBPS = intArrayOf(2500, 1800, 1300, 900, 700, 500)
 
         const val REFRESH_START_MIN = 10.0
-        const val REFRESH_INTERVAL_MIN = 8.0
-        val REFRESH_LEVELS_HZ = floatArrayOf(90f, 60f)
+        const val REFRESH_INTERVAL_MIN = 4.0
+        // 更細緻曲線：系統會自動映射到裝置實際支援的最接近檔位（最低 60Hz）
+        val REFRESH_LEVELS_HZ = floatArrayOf(110f, 100f, 90f, 80f, 72f, 60f)
 
         const val CHANNEL_ID = "sleep_guardian_channel"
 
