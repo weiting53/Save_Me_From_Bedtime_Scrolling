@@ -105,6 +105,17 @@
                 android:backgroundTint="#1e2b3d"
                 android:popupBackground="#0c1322" />
 
+            <Switch
+                android:id="@+id/sw_daily_schedule"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="每日自動開始"
+                android:textColor="#3d4e62"
+                android:textSize="11sp"
+                android:thumbTint="#2e3d50"
+                android:trackTint="#1a2535" />
+
             <!-- ── 裝飾分隔線 ── -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -236,6 +247,21 @@
                 android:strokeWidth="1dp"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:enabled="false" />
+
+            <TextView
+                android:id="@+id/tv_demo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:padding="10dp"
+                android:text="demo模式"
+                android:textColor="#253040"
+                android:textSize="9sp"
+                android:alpha="0.26"
+                android:letterSpacing="0.08"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
 
         </LinearLayout>
     </ScrollView>

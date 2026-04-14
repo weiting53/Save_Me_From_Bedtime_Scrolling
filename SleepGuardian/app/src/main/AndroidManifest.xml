@@ -14,6 +14,8 @@
     <!-- Android 13+ 通知權限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- 選用：透過 ADB 授予後，可控制系統灰階模式 -->
     <!-- adb shell pm grant com.sleepguardian android.permission.WRITE_SECURE_SETTINGS -->
     <uses-permission
@@ -51,6 +53,22 @@
                 <action android:name="android.net.VpnService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".SleepAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sleepguardian.ACTION_DAILY_SLEEP_START" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

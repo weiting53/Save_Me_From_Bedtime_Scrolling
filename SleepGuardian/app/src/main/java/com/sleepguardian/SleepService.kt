@@ -66,7 +66,14 @@ class SleepService : Service() {
 
         const val CHANNEL_ID = "sleep_guardian_channel"
 
+        const val EXTRA_DEMO = "demo_mode"
+        private const val DEMO_DURATION_MS = 15_000L
+        private const val DEMO_SEGMENT_MS = 3_750L
+        /** 每段約 3.75 秒內對應的「虛擬經過分鐘」，用來快轉看見降亮／灰階／網速／更新率效果 */
+        private const val DEMO_VIRTUAL_SPAN_MIN = 32.0
+
         @Volatile var isRunning = false
+        @Volatile var isDemoModeActive = false
     }
 
     private lateinit var windowManager: WindowManager
@@ -83,6 +90,12 @@ class SleepService : Service() {
     private var originalPeakRefreshRate: Float? = null
     private var originalMinRefreshRate: Float? = null
 
+    private var isDemoMode = false
+    private var demoStartWallClock = 0L
+    private var demoEndWallClock = 0L
+    private var persistedUserMode = MODE_BUNDLE
+    private var lastDemoSegment = -1
+
     // ────────────────────────────────────────────
     // 每 30 秒執行一次的 tick
     // ────────────────────────────────────────────
@@ -90,6 +103,19 @@ class SleepService : Service() {
         override fun run() {
             tick()
             handler.postDelayed(this, 30_000L)
+        }
+    }
+
+    private val demoRunnable = object : Runnable {
+        override fun run() {
+            if (!isDemoMode) return
+            val now = System.currentTimeMillis()
+            if (now >= demoEndWallClock) {
+                stopDemoAndShutdown()
+                return
+            }
+            demoTick()
+            handler.postDelayed(this, 250L)
         }
     }
 
@@ -105,6 +131,11 @@ class SleepService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+
+        if (intent?.getBooleanExtra(EXTRA_DEMO, false) == true) {
+            startDemoSession(prefs)
+            return START_NOT_STICKY
+        }
 
         sleepTimeMillis = intent?.getLongExtra(EXTRA_SLEEP_TIME, 0L)
             ?: prefs.getLong(KEY_SLEEP_TIME, 0L)
@@ -129,6 +160,10 @@ class SleepService : Service() {
         }
         captureOriginalRefreshSettingsIfNeeded()
 
+        isDemoMode = false
+        isDemoModeActive = false
+        handler.removeCallbacks(demoRunnable)
+
         startForeground(1, buildNotification("睡眠引導中", "背景監控中，等待睡覺時間…"))
 
         handler.removeCallbacks(tickRunnable)
@@ -140,7 +175,11 @@ class SleepService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        isDemoMode = false
+        isDemoModeActive = false
+        lastDemoSegment = -1
         handler.removeCallbacks(tickRunnable)
+        handler.removeCallbacks(demoRunnable)
 
         // 移除遮罩
         removeOverlays()
@@ -160,57 +199,141 @@ class SleepService : Service() {
     // 核心邏輯
     // ────────────────────────────────────────────
     private fun tick() {
+        if (isDemoMode) return
+
         // 到了起床時間 → 自動關閉服務，恢復亮度與灰階
-        if (wakeTimeMillis > 0 && System.currentTimeMillis() >= wakeTimeMillis) {
+        if (wakeTimeMillis > 0 && wakeTimeMillis != Long.MAX_VALUE &&
+            System.currentTimeMillis() >= wakeTimeMillis) {
             updateNotification("自動關閉", "已到起床時間，引導結束，早安 ☀️")
             handler.postDelayed({ stopSelf() }, 2_000L)
             return
         }
 
         val diffMin = (System.currentTimeMillis() - sleepTimeMillis) / 60_000.0
+        val (phase, noticeText) = evaluatePhase(diffMin)
+        applyEffectsForDiffMin(diffMin)
+        updateNotification(phase, noticeText)
+    }
 
-        val phase: String
-        val noticeText: String
+    private fun startDemoSession(prefs: android.content.SharedPreferences) {
+        handler.removeCallbacks(tickRunnable)
+        isDemoMode = true
+        isDemoModeActive = true
+        lastDemoSegment = -1
+        persistedUserMode = prefs.getInt(KEY_MODE, MODE_BUNDLE)
+        demoStartWallClock = System.currentTimeMillis()
+        demoEndWallClock = demoStartWallClock + DEMO_DURATION_MS
+        wakeTimeMillis = Long.MAX_VALUE
 
-        when {
-            // 還沒到睡覺時間
+        if (originalBrightness == -1 && Settings.System.canWrite(this)) {
+            originalBrightness = Settings.System.getInt(
+                contentResolver, Settings.System.SCREEN_BRIGHTNESS, 200
+            )
+        }
+        captureOriginalRefreshSettingsIfNeeded()
+
+        startForeground(1, buildNotification("Demo 演練", "15 秒內輪播四種勸睡模式…"))
+        handler.post(demoRunnable)
+    }
+
+    private fun demoTick() {
+        val elapsed = (System.currentTimeMillis() - demoStartWallClock).coerceAtLeast(0L)
+        val segment = (elapsed / DEMO_SEGMENT_MS).toInt().coerceIn(0, 3)
+        if (segment != lastDemoSegment) {
+            lastDemoSegment = segment
+            restoreDemoInterSegmentState()
+        }
+        val segmentMode = when (segment) {
+            0 -> MODE_BUNDLE
+            1 -> MODE_DIM_GRAY_ONLY
+            2 -> MODE_NETWORK_ONLY
+            3 -> MODE_REFRESH_ONLY
+            else -> MODE_BUNDLE
+        }
+        val segStart = segment * DEMO_SEGMENT_MS
+        val segElapsed = (elapsed - segStart).coerceAtLeast(0L).toDouble()
+        val virtualDiffMin = (segElapsed / DEMO_SEGMENT_MS.toDouble()) * DEMO_VIRTUAL_SPAN_MIN
+
+        val label = when (segmentMode) {
+            MODE_BUNDLE -> "組合包"
+            MODE_DIM_GRAY_ONLY -> "亮度＋灰階"
+            MODE_NETWORK_ONLY -> "僅降網速"
+            MODE_REFRESH_ONLY -> "僅降更新率"
+            else -> ""
+        }
+
+        val saved = selectedMode
+        selectedMode = segmentMode
+        applyEffectsForDiffMin(virtualDiffMin)
+        selectedMode = saved
+
+        val (phase, body) = evaluatePhase(virtualDiffMin)
+        val secLeft = ((demoEndWallClock - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+        updateNotification(
+            "Demo ${segment + 1}/4・$label・$phase",
+            "$body（約 ${secLeft}s 結束）"
+        )
+    }
+
+    private fun stopDemoAndShutdown() {
+        isDemoMode = false
+        isDemoModeActive = false
+        handler.removeCallbacks(demoRunnable)
+        lastDemoSegment = -1
+        selectedMode = persistedUserMode
+        restoreDemoInterSegmentState()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun restoreDemoInterSegmentState() {
+        resetNetworkThrottle()
+        restoreRefreshRate()
+        restoreBrightness()
+        trySetSystemGrayscale(false)
+        removeOverlays()
+    }
+
+    private fun evaluatePhase(diffMin: Double): Pair<String, String> {
+        return when {
             diffMin < 0 -> {
                 val rem = (-diffMin).toInt()
-                phase      = "等待中"
-                noticeText = "距離睡覺還有 $rem 分鐘"
+                "等待中" to "距離睡覺還有 $rem 分鐘"
             }
+            diffMin < DIM_START_MIN -> {
+                "就寢時刻" to "睡覺時間到了，放鬆一下 ✨"
+            }
+            diffMin < GRAY_START_MIN -> {
+                val dimPct = calcDimPct(diffMin)
+                "漸暗模式" to buildStatusText(dimPct, null, currentNetCapKbps, currentRefreshRateHz)
+            }
+            else -> {
+                val dimPct = calcDimPct(diffMin)
+                val grayPct = calcGrayPct(diffMin)
+                "灰階模式" to buildStatusText(dimPct, grayPct, currentNetCapKbps, currentRefreshRateHz)
+            }
+        }
+    }
 
-            // 睡覺時間已到，但還沒開始降亮（T+0 ~ T+3）
+    private fun applyEffectsForDiffMin(diffMin: Double) {
+        when {
+            diffMin < 0 -> Unit
             diffMin < DIM_START_MIN -> {
                 applyRefreshRateByTimeline(diffMin)
-                phase      = "就寢時刻"
-                noticeText = "睡覺時間到了，放鬆一下 ✨"
             }
-
-            // T+3 以後：開始降低系統亮度
             diffMin < GRAY_START_MIN -> {
                 val dimPct = calcDimPct(diffMin)
                 applyBrightnessAndGrayscale(diffMin, dimPct)
                 applyNetworkThrottleByTimeline(diffMin)
                 applyRefreshRateByTimeline(diffMin)
-                phase      = "漸暗模式"
-                noticeText  = buildStatusText(dimPct, null, currentNetCapKbps, currentRefreshRateHz)
             }
-
-            // T+15 以後：亮度繼續降，同時開始灰階
             else -> {
-                val dimPct  = calcDimPct(diffMin)
-                val grayPct = calcGrayPct(diffMin)
+                val dimPct = calcDimPct(diffMin)
                 applyBrightnessAndGrayscale(diffMin, dimPct)
                 applyNetworkThrottleByTimeline(diffMin)
                 applyRefreshRateByTimeline(diffMin)
-
-                phase      = "灰階模式"
-                noticeText  = buildStatusText(dimPct, grayPct, currentNetCapKbps, currentRefreshRateHz)
             }
         }
-
-        updateNotification(phase, noticeText)
     }
 
     private fun calcDimPct(diffMin: Double): Int {
