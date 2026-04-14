@@ -50,9 +50,8 @@ class SleepService : Service() {
         const val DIM_INTERVAL_MIN = 3.0
         const val DIM_MAX_PCT      = 75        // 最暗降到原始亮度的 25%
 
-        const val GRAY_START_MIN   = 15.0
+        const val GRAY_START_MIN    = 15.0
         const val GRAY_INTERVAL_MIN = 3.0
-        // 灰階進程：每 3 分鐘遞進，0→20→40→60→80→100%
         val GRAY_LEVELS = intArrayOf(20, 40, 60, 80, 100)
 
         const val NET_START_MIN    = 10.0
@@ -67,9 +66,9 @@ class SleepService : Service() {
         const val CHANNEL_ID = "sleep_guardian_channel"
 
         const val EXTRA_DEMO = "demo_mode"
-        private const val DEMO_DURATION_MS = 15_000L
-        private const val DEMO_SEGMENT_MS = 3_750L
-        /** 每段約 3.75 秒內對應的「虛擬經過分鐘」，用來快轉看見降亮／灰階／網速／更新率效果 */
+        private const val DEMO_DURATION_MS = 60_000L
+        private const val DEMO_SEGMENT_MS = 15_000L
+        /** 每段 15 秒內對應的「虛擬經過分鐘」，用來快轉看見降亮／灰階／網速／更新率效果 */
         private const val DEMO_VIRTUAL_SPAN_MIN = 32.0
 
         @Volatile var isRunning = false
@@ -77,8 +76,7 @@ class SleepService : Service() {
     }
 
     private lateinit var windowManager: WindowManager
-    private var dimView:  View? = null   // 黑色遮罩（降低亮度用）
-    private var grayView: View? = null   // 灰色遮罩（視覺灰階 fallback）
+    private var grayView: View? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private var sleepTimeMillis = 0L
@@ -181,9 +179,7 @@ class SleepService : Service() {
         handler.removeCallbacks(tickRunnable)
         handler.removeCallbacks(demoRunnable)
 
-        // 移除遮罩
         removeOverlays()
-
         // 嘗試恢復系統亮度
         restoreBrightness()
         resetNetworkThrottle()
@@ -232,7 +228,7 @@ class SleepService : Service() {
         }
         captureOriginalRefreshSettingsIfNeeded()
 
-        startForeground(1, buildNotification("Demo 演練", "15 秒內輪播四種勸睡模式…"))
+        startForeground(1, buildNotification("Demo 演練", "60 秒內輪播四種勸睡模式（各 15 秒）…"))
         handler.post(demoRunnable)
     }
 
@@ -506,19 +502,49 @@ class SleepService : Service() {
     }
 
     // ────────────────────────────────────────────
-    // 灰階：先試系統無障礙灰階，不行再用 Overlay
+    // 灰階：優先系統灰階（ADB 授權），fallback 為半透明灰色 Overlay
+    // Overlay 設 FLAG_NOT_TOUCHABLE，確保彈出視窗與互動不受阻擋
     // ────────────────────────────────────────────
     private fun applyGrayscale(pct: Int) {
         if (trySetSystemGrayscale(pct > 0)) {
-            // 成功使用系統灰階，移除灰色 Overlay（避免重疊）
             grayView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
             grayView = null
         } else {
-            // Fallback：疊加半透明灰色 Overlay 模擬灰階視覺效果
-            val alpha = pct / 100f * 0.75f   // 最高 75% 不透明度
+            val alpha = pct / 100f * 0.75f
             ensureGrayOverlay()
             grayView?.alpha = alpha
         }
+    }
+
+    private fun overlayParams() = WindowManager.LayoutParams(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
+        // FLAG_NOT_TOUCHABLE：所有觸控事件穿透遮罩，不阻擋任何彈出視窗
+        // FLAG_NOT_FOCUSABLE：不搶焦點，不影響鍵盤與輸入
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+        PixelFormat.TRANSLUCENT
+    )
+
+    private fun ensureGrayOverlay() {
+        if (grayView == null && Settings.canDrawOverlays(this)) {
+            grayView = View(this).apply {
+                setBackgroundColor(Color.parseColor("#808080"))
+                alpha = 0f
+            }
+            windowManager.addView(grayView, overlayParams())
+        }
+    }
+
+    private fun removeOverlays() {
+        grayView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        grayView = null
     }
 
     /**
@@ -538,41 +564,6 @@ class SleepService : Service() {
         } catch (_: SecurityException) {
             false
         }
-    }
-
-    // ────────────────────────────────────────────
-    // WindowManager Overlay 管理
-    // ────────────────────────────────────────────
-    private fun overlayParams() = WindowManager.LayoutParams(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else
-            @Suppress("DEPRECATION")
-            WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT
-    )
-
-    private fun ensureGrayOverlay() {
-        if (grayView == null && Settings.canDrawOverlays(this)) {
-            grayView = View(this).apply {
-                setBackgroundColor(Color.parseColor("#B0B0B0"))
-                alpha = 0f
-            }
-            windowManager.addView(grayView, overlayParams())
-        }
-    }
-
-    private fun removeOverlays() {
-        dimView?.let  { try { windowManager.removeView(it) } catch (_: Exception) {} }
-        grayView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
-        dimView  = null
-        grayView = null
     }
 
     // ────────────────────────────────────────────

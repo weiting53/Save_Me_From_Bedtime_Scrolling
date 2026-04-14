@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 夜燈暖光：多層同心橢圓，從外到內由極淡到明亮 -->
+<!-- 搭配 96dp × 96dp ImageView 使用 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 最外圈暈光 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#08c9a96e"/>
+        </shape>
+    </item>
+    <item android:top="10dp" android:bottom="10dp"
+          android:left="10dp" android:right="10dp">
+        <shape android:shape="oval">
+            <solid android:color="#15c9a96e"/>
+        </shape>
+    </item>
+    <item android:top="20dp" android:bottom="20dp"
+          android:left="20dp" android:right="20dp">
+        <shape android:shape="oval">
+            <solid android:color="#28c9a96e"/>
+        </shape>
+    </item>
+    <item android:top="30dp" android:bottom="30dp"
+          android:left="30dp" android:right="30dp">
+        <shape android:shape="oval">
+            <solid android:color="#50c9a96e"/>
+        </shape>
+    </item>
+    <!-- 亮芯 -->
+    <item android:top="38dp" android:bottom="38dp"
+          android:left="38dp" android:right="38dp">
+        <shape android:shape="oval">
+            <solid android:color="#90d4a84a"/>
+        </shape>
+    </item>
+    <!-- 最亮核心 -->
+    <item android:top="42dp" android:bottom="42dp"
+          android:left="42dp" android:right="42dp">
+        <shape android:shape="oval">
+            <solid android:color="#FFE8B050"/>
+        </shape>
+    </item>
+</layer-list>

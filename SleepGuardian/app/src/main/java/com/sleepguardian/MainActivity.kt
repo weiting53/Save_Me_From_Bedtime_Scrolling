@@ -1,5 +1,6 @@
 package com.sleepguardian
 
+import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,11 +9,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -64,30 +61,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val modeLabels = listOf(
+        "組合包（亮度 ＋ 灰階 ＋ 網速 ＋ 更新率）",
+        "亮度 ＋ 灰階",
+        "僅降網速",
+        "僅降更新率"
+    )
+    private val modeDots = listOf("● ○ ○ ○", "○ ● ○ ○", "○ ○ ● ○", "○ ○ ○ ●")
+
     // ── 元素
-    private lateinit var tvSleepTime: TextView
-    private lateinit var tvWakeTime:  TextView
-    private lateinit var tvStatus:    TextView
-    private lateinit var btnStart:    Button
-    private lateinit var btnStop:     Button
-    private lateinit var tvPhase:     TextView
-    private lateinit var spMode:      Spinner
-    private lateinit var swDaily:   Switch
-    private lateinit var tvDemo:    TextView
+    private lateinit var tvSleepTime:  TextView
+    private lateinit var tvWakeTime:   TextView
+    private lateinit var tvStatus:     TextView
+    private lateinit var btnStart:     Button
+    private lateinit var btnStop:      Button
+    private lateinit var tvPhase:      TextView
+    private lateinit var btnModePrev:  Button
+    private lateinit var btnModeNext:  Button
+    private lateinit var tvModeLabel:  TextView
+    private lateinit var tvModeDots:   TextView
+    private lateinit var swDaily:      Switch
+    private lateinit var tvDemo:       TextView
+    private lateinit var tvAdbHint:    TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvSleepTime = findViewById(R.id.tv_sleep_time)
-        tvWakeTime  = findViewById(R.id.tv_wake_time)
-        tvStatus    = findViewById(R.id.tv_status)
-        btnStart    = findViewById(R.id.btn_start)
-        btnStop     = findViewById(R.id.btn_stop)
-        tvPhase     = findViewById(R.id.tv_phase)
-        spMode      = findViewById(R.id.sp_mode)
-        swDaily     = findViewById(R.id.sw_daily_schedule)
-        tvDemo      = findViewById(R.id.tv_demo)
+        tvSleepTime  = findViewById(R.id.tv_sleep_time)
+        tvWakeTime   = findViewById(R.id.tv_wake_time)
+        tvStatus     = findViewById(R.id.tv_status)
+        btnStart     = findViewById(R.id.btn_start)
+        btnStop      = findViewById(R.id.btn_stop)
+        tvPhase      = findViewById(R.id.tv_phase)
+        btnModePrev  = findViewById(R.id.btn_mode_prev)
+        btnModeNext  = findViewById(R.id.btn_mode_next)
+        tvModeLabel  = findViewById(R.id.tv_mode_label)
+        tvModeDots   = findViewById(R.id.tv_mode_dots)
+        swDaily      = findViewById(R.id.sw_daily_schedule)
+        tvDemo       = findViewById(R.id.tv_demo)
+        tvAdbHint    = findViewById(R.id.tv_adb_hint)
 
         // 從 SharedPreferences 讀取上次設定
         val prefs = getSharedPreferences(SleepService.PREFS, MODE_PRIVATE)
@@ -99,7 +112,7 @@ class MainActivity : AppCompatActivity() {
 
         updateSleepTimeDisplay()
         updateWakeTimeDisplay()
-        setupModeSpinner()
+        setupModeBar()
 
         swDaily.setOnCheckedChangeListener { _, isChecked ->
             SleepScheduleHelper.setDailyEnabled(this, isChecked)
@@ -114,6 +127,11 @@ class MainActivity : AppCompatActivity() {
         btnStart.setOnClickListener { checkPermissionsAndStart() }
         btnStop.setOnClickListener  { stopGuardian() }
         tvDemo.setOnClickListener   { tryStartDemo() }
+        tvAdbHint.setOnClickListener { showAdbDialog() }
+
+        if (SleepScheduleHelper.isDailyEnabled(this)) {
+            SleepScheduleHelper.scheduleNextOccurrence(this)
+        }
     }
 
     override fun onResume() {
@@ -158,27 +176,30 @@ class MainActivity : AppCompatActivity() {
         tvWakeTime.text = String.format("%02d:%02d", wakeHour, wakeMinute)
     }
 
-    private fun setupModeSpinner() {
-        val options = listOf(
-            "組合包（亮度＋灰階＋降網速＋降更新率）",
-            "各自功能：亮度＋灰階",
-            "各自功能：僅降網速",
-            "各自功能：僅降更新率"
-        )
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, options).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+    private fun setupModeBar() {
+        updateModeBar()
+        btnModePrev.setOnClickListener {
+            selectedMode = (selectedMode - 1 + modeLabels.size) % modeLabels.size
+            saveModePreference()
+            updateModeBar()
         }
-        spMode.adapter = adapter
-        spMode.setSelection(selectedMode.coerceIn(0, options.lastIndex), false)
-        spMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedMode = position
-                getSharedPreferences(SleepService.PREFS, MODE_PRIVATE).edit()
-                    .putInt(SleepService.KEY_MODE, selectedMode)
-                    .apply()
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        btnModeNext.setOnClickListener {
+            selectedMode = (selectedMode + 1) % modeLabels.size
+            saveModePreference()
+            updateModeBar()
         }
+    }
+
+    private fun updateModeBar() {
+        val idx = selectedMode.coerceIn(0, modeLabels.lastIndex)
+        tvModeLabel.text = modeLabels[idx]
+        tvModeDots.text  = modeDots[idx]
+    }
+
+    private fun saveModePreference() {
+        getSharedPreferences(SleepService.PREFS, MODE_PRIVATE).edit()
+            .putInt(SleepService.KEY_MODE, selectedMode)
+            .apply()
     }
 
     private fun resumePermissionFlow() {
@@ -197,7 +218,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkPermissionsAndStartInternal() {
         if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "請允許「顯示在其他應用程式上面」的權限", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "請允許「在其他應用程式上方顯示」的權限（灰階遮罩需要）", Toast.LENGTH_LONG).show()
             overlayLauncher.launch(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName"))
@@ -250,7 +271,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun tryStartDemoInternal() {
         if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "Demo 需要 Overlay 權限", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Demo 需要 Overlay 權限（灰階遮罩）", Toast.LENGTH_LONG).show()
             overlayLauncher.launch(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName"))
@@ -292,6 +313,27 @@ class MainActivity : AppCompatActivity() {
             startService(intent)
         }
         refreshUI()
+    }
+
+    private fun showAdbDialog() {
+        val cmd = "adb shell pm grant com.sleepguardian android.permission.WRITE_SECURE_SETTINGS"
+        AlertDialog.Builder(this)
+            .setTitle("灰階功能 · 一次性 ADB 授權")
+            .setMessage(
+                "灰階使用 Android 系統無障礙灰階（非遮罩），效果更乾淨。\n\n" +
+                "連接電腦（USB / 無線 ADB），執行一次：\n\n" +
+                "$cmd\n\n" +
+                "授權後重新啟動 App 即生效，之後不需再做。"
+            )
+            .setPositiveButton("知道了", null)
+            .setNeutralButton("複製指令") { _, _ ->
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(
+                    android.content.ClipData.newPlainText("ADB 指令", cmd)
+                )
+                Toast.makeText(this, "已複製到剪貼簿", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     // ── 所有權限就緒後啟動服務

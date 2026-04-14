@@ -4,12 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- ── 星空流星背景動畫 ── -->
+    <!-- 星空流星背景動畫 -->
     <com.sleepguardian.StarfieldView
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- ── 主要內容 ── -->
+    <!-- 主要內容 -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -22,108 +22,213 @@
             android:orientation="vertical"
             android:gravity="center_horizontal"
             android:paddingHorizontal="28dp"
-            android:paddingTop="68dp"
+            android:paddingTop="72dp"
             android:paddingBottom="48dp">
 
-            <!-- 月亮圖示 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="☾"
-                android:textColor="#c9a96e"
-                android:textSize="24sp"
-                android:layout_marginBottom="6dp" />
-
-            <!-- App 名稱 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="S L E E P  G U A R D I A N"
-                android:textColor="#253040"
-                android:textSize="8.5sp"
-                android:letterSpacing="0.45"
-                android:fontFamily="sans-serif-light"
-                android:layout_marginBottom="52dp" />
-
-            <!-- ════ 睡覺時間區 ════ -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="預 計 睡 覺 時 間"
-                android:textColor="#3d4e62"
-                android:textSize="10sp"
-                android:letterSpacing="0.22"
-                android:layout_marginBottom="0dp" />
-
-            <!-- 大時間數字（點擊可修改） -->
+            <!-- ════ 夜燈 + 睡覺時間 ════ -->
             <LinearLayout
-                android:id="@+id/time_sleep_area"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:paddingVertical="2dp">
+                android:layout_marginBottom="4dp">
 
-                <TextView
-                    android:id="@+id/tv_sleep_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="23:00"
-                    android:textColor="#ddd9cc"
-                    android:textSize="82sp"
-                    android:fontFamily="sans-serif-thin"
-                    android:letterSpacing="-0.04"
-                    android:includeFontPadding="false" />
+                <!-- 夜燈暖光 -->
+                <ImageView
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:src="@drawable/lamp_glow"
+                    android:contentDescription="夜燈"
+                    android:layout_marginEnd="12dp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- 右欄：睡覺時間 + 起床時間 -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="✎"
-                    android:textColor="#2e3e52"
-                    android:textSize="20sp"
-                    android:paddingStart="6dp"
-                    android:paddingBottom="10dp" />
+                    android:orientation="vertical">
+
+                    <!-- 睡覺時間標籤 -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="預 計 睡 覺 時 間"
+                        android:textColor="#3d4e62"
+                        android:textSize="8.5sp"
+                        android:letterSpacing="0.22" />
+
+                    <!-- 睡覺時間（大字，可點擊） -->
+                    <LinearLayout
+                        android:id="@+id/time_sleep_area"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:paddingVertical="2dp">
+
+                        <TextView
+                            android:id="@+id/tv_sleep_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="23:00"
+                            android:textColor="#ddd9cc"
+                            android:textSize="58sp"
+                            android:fontFamily="sans-serif-thin"
+                            android:letterSpacing="-0.04"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="✎"
+                            android:textColor="#2e3e52"
+                            android:textSize="14sp"
+                            android:paddingStart="6dp"
+                            android:paddingBottom="8dp" />
+                    </LinearLayout>
+
+                    <!-- 起床時間（小字，可點擊） -->
+                    <LinearLayout
+                        android:id="@+id/time_wake_area"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:paddingVertical="4dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="自動關閉  "
+                            android:textColor="#2b3a4e"
+                            android:textSize="9sp"
+                            android:letterSpacing="0.08" />
+
+                        <TextView
+                            android:id="@+id/tv_wake_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="05:00"
+                            android:textColor="#556070"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-light"
+                            android:letterSpacing="-0.02" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=" ✎"
+                            android:textColor="#1e2e3e"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
+            <!-- ════ 勸睡模式選擇 Bar ════ -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="勸 睡 模 式"
                 android:textColor="#3d4e62"
-                android:textSize="10sp"
+                android:textSize="8.5sp"
                 android:letterSpacing="0.22"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="4dp" />
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp" />
 
-            <Spinner
-                android:id="@+id/sp_mode"
-                android:layout_width="220dp"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/mode_bar_bg">
+
+                <Button
+                    android:id="@+id/btn_mode_prev"
+                    android:layout_width="52dp"
+                    android:layout_height="match_parent"
+                    android:text="◀"
+                    android:textColor="#c9a96e"
+                    android:textSize="14sp"
+                    android:backgroundTint="@android:color/transparent"
+                    style="?attr/borderlessButtonStyle" />
+
+                <TextView
+                    android:id="@+id/tv_mode_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="組合包"
+                    android:textColor="#c9a96e"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.06"
+                    android:fontFamily="sans-serif-light"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+
+                <Button
+                    android:id="@+id/btn_mode_next"
+                    android:layout_width="52dp"
+                    android:layout_height="match_parent"
+                    android:text="▶"
+                    android:textColor="#c9a96e"
+                    android:textSize="14sp"
+                    android:backgroundTint="@android:color/transparent"
+                    style="?attr/borderlessButtonStyle" />
+            </LinearLayout>
+
+            <!-- 模式位置指示點 -->
+            <TextView
+                android:id="@+id/tv_mode_dots"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:backgroundTint="#1e2b3d"
-                android:popupBackground="#0c1322" />
+                android:text="● ○ ○ ○"
+                android:textColor="#c9a96e"
+                android:textSize="6sp"
+                android:letterSpacing="0.6"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="16dp" />
 
+            <!-- ════ 每日開關 + ADB 提示 ════ -->
             <Switch
                 android:id="@+id/sw_daily_schedule"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginBottom="4dp"
                 android:text="每日自動開始"
                 android:textColor="#3d4e62"
                 android:textSize="11sp"
                 android:thumbTint="#2e3d50"
                 android:trackTint="#1a2535" />
 
-            <!-- ── 裝飾分隔線 ── -->
+            <TextView
+                android:id="@+id/tv_adb_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="6dp"
+                android:text="💡 灰階需一次性 ADB 授權（點我查看）"
+                android:textColor="#3d4e62"
+                android:textSize="9.5sp"
+                android:alpha="0.55"
+                android:letterSpacing="0.04"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
+            <!-- 裝飾分隔線 -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="12dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="14dp">
 
                 <View
                     android:layout_width="0dp"
@@ -145,49 +250,6 @@
                     android:background="#0d1825" />
             </LinearLayout>
 
-            <!-- ════ 起床時間區 ════ -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="早 上 自 動 關 閉"
-                android:textColor="#2e3d50"
-                android:textSize="10sp"
-                android:letterSpacing="0.22"
-                android:layout_marginBottom="0dp" />
-
-            <!-- 起床時間數字（較小，次要） -->
-            <LinearLayout
-                android:id="@+id/time_wake_area"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:paddingVertical="2dp">
-
-                <TextView
-                    android:id="@+id/tv_wake_time"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="05:00"
-                    android:textColor="#6a7a90"
-                    android:textSize="54sp"
-                    android:fontFamily="sans-serif-thin"
-                    android:letterSpacing="-0.03"
-                    android:includeFontPadding="false" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="✎"
-                    android:textColor="#222e3e"
-                    android:textSize="14sp"
-                    android:paddingStart="5dp"
-                    android:paddingBottom="6dp" />
-            </LinearLayout>
-
             <!-- ════ 狀態卡片 ════ -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -197,8 +259,7 @@
                 android:background="@drawable/card_bg"
                 android:paddingVertical="20dp"
                 android:paddingHorizontal="24dp"
-                android:layout_marginTop="30dp"
-                android:layout_marginBottom="28dp">
+                android:layout_marginBottom="20dp">
 
                 <TextView
                     android:id="@+id/tv_phase"
@@ -248,6 +309,7 @@
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:enabled="false" />
 
+            <!-- Demo 入口（低調） -->
             <TextView
                 android:id="@+id/tv_demo"
                 android:layout_width="wrap_content"

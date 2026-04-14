@@ -8,6 +8,7 @@ Android 原生 APP，在使用者設定的睡覺時間後，於背景依時間�
 
 ```
 MainActivity                 ← UI、權限與 VPN 準備、服務啟停、每日開關、Demo 入口
+    │                           ADB 提示對話框（一鍵複製指令）
     │
     ├── SleepService         ← 前景服務（時間軸 tick / Demo 快轉）
     │       ├── 系統亮度控制     (Settings.System.SCREEN_BRIGHTNESS)
@@ -18,8 +19,10 @@ MainActivity                 ← UI、權限與 VPN 準備、服務啟停、每�
     │
     ├── PulseThrottleVpnService  ← VpnService：脈衝式節流（近似降速，無 root）
     │
-    ├── SleepScheduleHelper      ← AlarmManager：每日睡覺時刻排程
-    ├── SleepAlarmReceiver       ← 到點啟動 SleepService，並排定隔天同一時刻
+    ├── SleepScheduleHelper      ← AlarmManager 每日排程
+    │       ├── scheduleNextOccurrence    ← 排定「下一次」（今天已過則明天）
+    │       └── scheduleNextDaySameTime   ← 鬧鐘觸發後排「隔天同一時刻」
+    ├── SleepAlarmReceiver       ← 到點檢查權限；齊全則啟動服務，缺少則發通知提醒
     └── BootReceiver             ← 開機後若每日排程開啟則重新排程
 ```
 
@@ -41,23 +44,26 @@ MainActivity                 ← UI、權限與 VPN 準備、服務啟停、每�
 ## 每日自動開始
 
 - 主畫面 **Switch「每日自動開始」**（`SleepScheduleHelper.KEY_DAILY_SCHEDULE`）。
-- 使用 **`AlarmManager.setAlarmClock`** 排定「下一次」預計睡覺時間（今天已過則明天）；鬧鐘圖示可點回 App。
-- **`SleepAlarmReceiver`**：到點後依偏好啟動 `SleepService`；無論是否成功啟動服務，**`finally` 內都會再排「隔天同一睡覺時刻」**，避免鏈條中斷。
+- 使用 **`AlarmManager.setAlarmClock`** 排定「下一次」預計睡覺時間（今天已過則明天，透過 `scheduleNextOccurrence`）；鬧鐘圖示可點回 App。
+- **`SleepAlarmReceiver`**：到點後先檢查必要權限（Overlay、WRITE_SETTINGS、通知）；
+  - 若**權限齊全**：依偏好啟動 `SleepService`。
+  - 若**缺少權限**：改發一則高優先度的「缺少權限」通知，提示使用者點擊開 App 補授權；**下一晚的鬧鐘仍照常排定**。
+  - 無論成功與否，**`finally` 內都呼叫 `scheduleNextDaySameTime`**（固定排在隔天同一時刻），避免鏈條中斷。
 - **`BootReceiver`**（`RECEIVE_BOOT_COMPLETED`）：開機後若每日排程為開啟，會重新排定下一次。
 - 修改「預計睡覺時間」且每日排程為開啟時，會 **重新排程**；手動「開始引導」成功且每日開啟時，也會 **同步排程**。
-- **注意**：自動啟動仍須裝置上已具備 **Overlay、修改系統設定、通知（Android 13+）** 等權限；若到點時權限不足，服務可能無法啟動，但隔天鬧鐘仍會繼續往後排。
 
 ---
 
 ## Demo 模式（內部展示用）
 
 - 主畫面底部低調文字 **「demo模式」**（半透明小字，不搶主流程）。
-- 約 **15 秒**內依序模擬四種勸睡差異（每段約 3.75 秒）：
+- 約 **60 秒**內依序模擬四種勸睡差異（每段各 **15 秒**）：
   1. 組合包  
   2. 亮度＋灰階  
   3. 僅降網速  
   4. 僅降更新率  
-- 每段內以 **虛擬時間快轉**（約 0～32 分鐘效果壓縮在單段內），並在 **段與段之間** 還原亮度、網速、更新率、灰階，避免上一段殘留。
+- 每段內以 **虛擬時間快轉**（約 0～32 分鐘效果壓縮在 15 秒內），並在 **段與段之間** 還原亮度、網速、更新率、灰階，避免上一段殘留。
+- 前景通知顯示當前段落（`Demo 1/4・組合包・漸暗模式` 等）與剩餘秒數。
 - 需與正式流程相同之權限；**含 VPN**（才能展示降網速段落）。
 - 若一般睡眠引導已在執行中，需先停止再跑 Demo；`SleepService.isDemoModeActive` 供 UI 判斷。
 
@@ -140,6 +146,8 @@ adb shell pm grant com.sleepguardian android.permission.WRITE_SECURE_SETTINGS
 
 授權後 APP 會自動偵測並優先使用系統灰階，同時移除灰色 Overlay。
 
+> **主畫面 ADB 提示**：灰階設定區下方有「💡 灰階需一次性 ADB 授權（點我查看）」小字，點擊後跳出對話框顯示指令，並可一鍵複製到剪貼簿，方便在電腦端貼上執行。
+
 ---
 
 ## 降網速細節（PulseThrottleVpnService）
@@ -219,4 +227,4 @@ SleepGuardian/
 - [ ] 停止後是否恢復亮度由使用者選擇
 - [ ] 小工具（Widget）顯示距離睡覺時間
 - [ ] 降網速：可選更精準的封包級節流或使用者可調脈衝參數
-- [ ] 每日到點時若權限不足，可改為通知提醒使用者進 App 補權限
+- [x] 每日到點時若權限不足，改為通知提醒使用者進 App 補權限（`SleepAlarmReceiver` 發高優先度通知，下一晚鬧鐘照常排定）
