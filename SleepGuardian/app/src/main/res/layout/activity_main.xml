@@ -1,330 +1,426 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
+<!--
+  純黑像素風格主畫面
+  背景：#000000，所有元件：#FFFFFF，邊框：細白實線（無 anti-alias）
+-->
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#000000">
 
-    <!-- 星空流星背景動畫 -->
-    <com.sleepguardian.StarfieldView
+    <!-- ── 頂端欄：App 標題 + ⚙ 按鈕 ── -->
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="44dp"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="6dp">
 
-    <!-- 主要內容 -->
-    <ScrollView
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:text="S L E E P  G U A R D I A N"
+            android:textColor="#FFFFFF"
+            android:textSize="8.5sp"
+            android:fontFamily="monospace"
+            android:alpha="0.45"/>
+
+        <TextView
+            android:id="@+id/tv_adb_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:text="&#9881;"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:alpha="0.6"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"/>
+    </RelativeLayout>
+
+    <!-- ── 7-segment 睡覺時鐘（可點擊修改時間） ── -->
+    <com.sleepguardian.SegmentClockView
+        android:id="@+id/clock_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        android:scrollbarThumbVertical="@android:color/transparent">
+        android:layout_height="0dp"
+        android:layout_weight="2.0"
+        android:paddingHorizontal="18dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"/>
+
+    <!-- ── MODE 標籤 ── -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:text="-  M O D E  -"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:fontFamily="monospace"
+        android:gravity="center"
+        android:letterSpacing="0.28"/>
+
+    <!-- ── 橫向滑動模式卡片 ── -->
+    <HorizontalScrollView
+        android:id="@+id/mode_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2.6"
+        android:scrollbars="none"
+        android:overScrollMode="never"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp">
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingHorizontal="28dp"
-            android:paddingTop="72dp"
-            android:paddingBottom="48dp">
+            android:id="@+id/mode_cards_container"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:clipChildren="false">
 
-            <!-- ════ 夜燈 + 睡覺時間 ════ -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="4dp">
-
-                <!-- 夜燈暖光 -->
-                <ImageView
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:src="@drawable/lamp_glow"
-                    android:contentDescription="夜燈"
-                    android:layout_marginEnd="12dp" />
-
-                <!-- 右欄：睡覺時間 + 起床時間 -->
+            <!-- Card 0: 組合包 -->
+            <com.sleepguardian.GlowCardView
+                android:id="@+id/card_0"
+                android:layout_width="200dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="16dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless">
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <!-- 睡覺時間標籤 -->
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="18dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="預 計 睡 覺 時 間"
-                        android:textColor="#3d4e62"
+                        android:text="&#9788;  &#9681;  &#8663;  &#8635;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginBottom="10dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="COMBO PACK"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Brightness + Grayscale\n+ Network + Refresh"
+                        android:textColor="#888888"
                         android:textSize="8.5sp"
-                        android:letterSpacing="0.22" />
-
-                    <!-- 睡覺時間（大字，可點擊） -->
-                    <LinearLayout
-                        android:id="@+id/time_sleep_area"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:paddingVertical="2dp">
-
-                        <TextView
-                            android:id="@+id/tv_sleep_time"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="23:00"
-                            android:textColor="#ddd9cc"
-                            android:textSize="58sp"
-                            android:fontFamily="sans-serif-thin"
-                            android:letterSpacing="-0.04"
-                            android:includeFontPadding="false" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="✎"
-                            android:textColor="#2e3e52"
-                            android:textSize="14sp"
-                            android:paddingStart="6dp"
-                            android:paddingBottom="8dp" />
-                    </LinearLayout>
-
-                    <!-- 起床時間（小字，可點擊） -->
-                    <LinearLayout
-                        android:id="@+id/time_wake_area"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:paddingVertical="4dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="自動關閉  "
-                            android:textColor="#2b3a4e"
-                            android:textSize="9sp"
-                            android:letterSpacing="0.08" />
-
-                        <TextView
-                            android:id="@+id/tv_wake_time"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="05:00"
-                            android:textColor="#556070"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-light"
-                            android:letterSpacing="-0.02" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=" ✎"
-                            android:textColor="#1e2e3e"
-                            android:textSize="10sp" />
-                    </LinearLayout>
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.4"/>
                 </LinearLayout>
-            </LinearLayout>
+            </com.sleepguardian.GlowCardView>
 
-            <!-- ════ 勸睡模式選擇 Bar ════ -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="勸 睡 模 式"
-                android:textColor="#3d4e62"
-                android:textSize="8.5sp"
-                android:letterSpacing="0.22"
-                android:layout_marginTop="18dp"
-                android:layout_marginBottom="8dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/mode_bar_bg">
-
-                <Button
-                    android:id="@+id/btn_mode_prev"
-                    android:layout_width="52dp"
-                    android:layout_height="match_parent"
-                    android:text="◀"
-                    android:textColor="#c9a96e"
-                    android:textSize="14sp"
-                    android:backgroundTint="@android:color/transparent"
-                    style="?attr/borderlessButtonStyle" />
-
-                <TextView
-                    android:id="@+id/tv_mode_label"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="組合包"
-                    android:textColor="#c9a96e"
-                    android:textSize="11sp"
-                    android:letterSpacing="0.06"
-                    android:fontFamily="sans-serif-light"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-
-                <Button
-                    android:id="@+id/btn_mode_next"
-                    android:layout_width="52dp"
-                    android:layout_height="match_parent"
-                    android:text="▶"
-                    android:textColor="#c9a96e"
-                    android:textSize="14sp"
-                    android:backgroundTint="@android:color/transparent"
-                    style="?attr/borderlessButtonStyle" />
-            </LinearLayout>
-
-            <!-- 模式位置指示點 -->
-            <TextView
-                android:id="@+id/tv_mode_dots"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="● ○ ○ ○"
-                android:textColor="#c9a96e"
-                android:textSize="6sp"
-                android:letterSpacing="0.6"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="16dp" />
-
-            <!-- ════ 每日開關 + ADB 提示 ════ -->
-            <Switch
-                android:id="@+id/sw_daily_schedule"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:text="每日自動開始"
-                android:textColor="#3d4e62"
-                android:textSize="11sp"
-                android:thumbTint="#2e3d50"
-                android:trackTint="#1a2535" />
-
-            <TextView
-                android:id="@+id/tv_adb_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="6dp"
-                android:text="💡 灰階需一次性 ADB 授權（點我查看）"
-                android:textColor="#3d4e62"
-                android:textSize="9.5sp"
-                android:alpha="0.55"
-                android:letterSpacing="0.04"
+            <!-- Card 1: 亮度 + 灰階 -->
+            <com.sleepguardian.GlowCardView
+                android:id="@+id/card_1"
+                android:layout_width="200dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
-            <!-- 裝飾分隔線 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="14dp"
-                android:layout_marginBottom="14dp">
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:background="#0d1825" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="  ✦  "
-                    android:textColor="#182535"
-                    android:textSize="10sp" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_weight="1"
-                    android:background="#0d1825" />
-            </LinearLayout>
-
-            <!-- ════ 狀態卡片 ════ -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:background="@drawable/card_bg"
-                android:paddingVertical="20dp"
-                android:paddingHorizontal="24dp"
-                android:layout_marginBottom="20dp">
-
-                <TextView
-                    android:id="@+id/tv_phase"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="尚未啟動"
-                    android:textColor="#c9a96e"
-                    android:textSize="12sp"
-                    android:letterSpacing="0.12"
-                    android:layout_marginBottom="6dp" />
-
-                <TextView
-                    android:id="@+id/tv_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="點「開始引導」讓引導在背景運行"
-                    android:textColor="#3a4d60"
-                    android:textSize="11sp"
+                android:background="?attr/selectableItemBackgroundBorderless">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
                     android:gravity="center"
-                    android:lineSpacingMultiplier="1.6"
-                    android:fontFamily="sans-serif-light" />
-            </LinearLayout>
+                    android:padding="18dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="&#9788;  &#9681;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="20sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginBottom="10dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DIM + GRAY"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Brightness +\nGrayscale Only"
+                        android:textColor="#888888"
+                        android:textSize="8.5sp"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.4"/>
+                </LinearLayout>
+            </com.sleepguardian.GlowCardView>
 
-            <!-- ════ 按鈕 ════ -->
-            <Button
-                android:id="@+id/btn_start"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:text="開  始  引  導"
-                android:textSize="13sp"
-                android:letterSpacing="0.18"
-                android:textColor="#060a14"
-                android:backgroundTint="#c9a96e"
-                android:layout_marginBottom="10dp" />
-
-            <Button
-                android:id="@+id/btn_stop"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:text="停  止  引  導"
-                android:textSize="11sp"
-                android:letterSpacing="0.12"
-                android:textColor="#2e3d50"
-                android:backgroundTint="#080f1e"
-                android:strokeColor="#162030"
-                android:strokeWidth="1dp"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:enabled="false" />
-
-            <!-- Demo 入口（低調） -->
-            <TextView
-                android:id="@+id/tv_demo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="40dp"
-                android:padding="10dp"
-                android:text="demo模式"
-                android:textColor="#253040"
-                android:textSize="9sp"
-                android:alpha="0.26"
-                android:letterSpacing="0.08"
+            <!-- Card 2: 僅降網速 -->
+            <com.sleepguardian.GlowCardView
+                android:id="@+id/card_2"
+                android:layout_width="200dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="16dp"
                 android:clickable="true"
                 android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
+                android:background="?attr/selectableItemBackgroundBorderless">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="18dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="&#8663;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="26sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginBottom="10dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="BANDWIDTH\nONLY"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="T+10 Network\nThrottle"
+                        android:textColor="#888888"
+                        android:textSize="8.5sp"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.4"/>
+                </LinearLayout>
+            </com.sleepguardian.GlowCardView>
+
+            <!-- Card 3: 僅降更新率 -->
+            <com.sleepguardian.GlowCardView
+                android:id="@+id/card_3"
+                android:layout_width="200dp"
+                android:layout_height="match_parent"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="18dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="&#8635;"
+                        android:textColor="#FFFFFF"
+                        android:textSize="28sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginBottom="10dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="REFRESH\nRATE ONLY"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:layout_marginBottom="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="T+10 Rate\nStep-Down"
+                        android:textColor="#888888"
+                        android:textSize="8.5sp"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.4"/>
+                </LinearLayout>
+            </com.sleepguardian.GlowCardView>
 
         </LinearLayout>
-    </ScrollView>
-</FrameLayout>
+    </HorizontalScrollView>
+
+    <!-- ── 起床時間（可點擊修改） ── -->
+    <LinearLayout
+        android:id="@+id/time_wake_area"
+        android:layout_width="wrap_content"
+        android:layout_height="38dp"
+        android:layout_gravity="center_horizontal"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="WAKE TIME: "
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:fontFamily="monospace"/>
+        <TextView
+            android:id="@+id/tv_wake_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="05:00"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="  [&#9998;]"
+            android:textColor="#555555"
+            android:textSize="10sp"
+            android:fontFamily="monospace"/>
+    </LinearLayout>
+
+    <!-- ── 睡眠插畫（兔兔與女孩 GIF） ── -->
+    <ImageView
+        android:id="@+id/iv_sleeping"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2.2"
+        android:scaleType="fitCenter"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"/>
+
+    <!-- ── 狀態列（精簡） ── -->
+    <TextView
+        android:id="@+id/tv_phase"
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:gravity="center"
+        android:text="IDLE"
+        android:textColor="#444444"
+        android:textSize="8sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.22"/>
+
+    <!-- tv_status: 隱藏（程式碼相容用，重要錯誤訊息透過 Toast 或 tv_phase 顯示） -->
+    <TextView
+        android:id="@+id/tv_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#555555"
+        android:textSize="8sp"
+        android:fontFamily="monospace"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:paddingHorizontal="16dp"
+        android:visibility="gone"/>
+
+    <!-- ── 開始 / 停止按鈕 ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingBottom="2dp">
+
+        <Button
+            android:id="@+id/btn_start"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="46dp"
+            android:text="START"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.25"
+            android:textColor="#000000"
+            android:backgroundTint="#FFFFFF"
+            android:layout_marginEnd="8dp"/>
+
+        <Button
+            android:id="@+id/btn_stop"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="46dp"
+            android:text="STOP"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.25"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#000000"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="1dp"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:enabled="false"/>
+    </LinearLayout>
+
+    <!-- ── 每日自動開始 ── -->
+    <Switch
+        android:id="@+id/sw_daily_schedule"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"
+        android:text="AUTO DAILY"
+        android:textColor="#555555"
+        android:textSize="8sp"
+        android:fontFamily="monospace"
+        android:thumbTint="#666666"
+        android:trackTint="#222222"/>
+
+    <!-- ── Demo 入口（低調） ── -->
+    <TextView
+        android:id="@+id/tv_demo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:padding="8dp"
+        android:paddingBottom="14dp"
+        android:text="demo"
+        android:textColor="#333333"
+        android:textSize="8sp"
+        android:fontFamily="monospace"
+        android:alpha="0.5"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackgroundBorderless"/>
+
+    <!-- 隱藏的相容 view（程式碼沿用） -->
+    <TextView android:id="@+id/tv_sleep_time"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <View android:id="@+id/time_sleep_area"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <Button android:id="@+id/btn_mode_prev"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <Button android:id="@+id/btn_mode_next"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <TextView android:id="@+id/tv_mode_label"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+    <TextView android:id="@+id/tv_mode_dots"
+        android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+
+</LinearLayout>

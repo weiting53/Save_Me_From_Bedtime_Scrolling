@@ -14,7 +14,7 @@ object SleepScheduleHelper {
 
     fun isDailyEnabled(context: Context): Boolean {
         return context.getSharedPreferences(SleepService.PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_DAILY_SCHEDULE, true)
+            .getBoolean(KEY_DAILY_SCHEDULE, false)  // 預設關閉，使用者主動開啟才排程
     }
 
     fun setDailyEnabled(context: Context, enabled: Boolean) {

@@ -9,6 +9,8 @@
 
     <!-- 前景服務（讓背景服務持續運行不被殺掉） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- targetSdk 升到 34 時 specialUse 類型為必填，提前宣告避免日後 crash -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Android 13+ 通知權限 -->
@@ -43,7 +45,12 @@
 
         <service
             android:name=".SleepService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="sleep_guardian_screen_control" />
+        </service>
 
         <service
             android:name=".PulseThrottleVpnService"

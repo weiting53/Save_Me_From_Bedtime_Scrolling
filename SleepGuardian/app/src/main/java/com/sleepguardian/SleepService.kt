@@ -40,6 +40,10 @@ class SleepService : Service() {
         const val KEY_MODE         = "guardian_mode"
         const val EXTRA_MODE       = "guardian_mode"
 
+        // 持久化原始亮度，讓 START_STICKY 重啟後仍能正確還原
+        const val KEY_ORIGINAL_BRIGHTNESS      = "original_brightness"
+        const val KEY_ORIGINAL_BRIGHTNESS_MODE = "original_brightness_mode"
+
         const val MODE_BUNDLE         = 0
         const val MODE_DIM_GRAY_ONLY  = 1
         const val MODE_NETWORK_ONLY   = 2
@@ -65,6 +69,9 @@ class SleepService : Service() {
 
         const val CHANNEL_ID = "sleep_guardian_channel"
 
+        /** 使用者手動還原後的寬限期（5 分鐘），期間不重新套用調整 */
+        private const val OVERRIDE_GRACE_MS = 5 * 60_000L
+
         const val EXTRA_DEMO = "demo_mode"
         private const val DEMO_DURATION_MS = 60_000L
         private const val DEMO_SEGMENT_MS = 15_000L
@@ -81,7 +88,8 @@ class SleepService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var sleepTimeMillis = 0L
     private var wakeTimeMillis  = 0L     // 早上自動關閉的時間點
-    private var originalBrightness = -1  // 記錄原始亮度，停止時恢復
+    private var originalBrightness     = -1  // 記錄原始亮度，停止時恢復
+    private var originalBrightnessMode = -1  // 記錄原始亮度模式（手動/自動）
     private var selectedMode = MODE_BUNDLE
     private var currentNetCapKbps: Int? = null
     private var currentRefreshRateHz: Float? = null
@@ -93,6 +101,16 @@ class SleepService : Service() {
     private var demoEndWallClock = 0L
     private var persistedUserMode = MODE_BUNDLE
     private var lastDemoSegment = -1
+
+    // ── 使用者手動還原偵測 ──────────────────────────────────────
+    /** 上次由服務寫入的系統亮度值（-1 = 尚未寫入） */
+    private var lastAppliedBrightness = -1
+    /** 是否透過 WRITE_SECURE_SETTINGS 成功啟用系統灰階 */
+    private var usingSystemGrayscale = false
+    /** 是否處於灰階啟用狀態（由服務設定） */
+    private var lastGrayscaleEnabled = false
+    /** 偵測到使用者覆蓋的時間點（0 = 無覆蓋狀態） */
+    private var userOverrideDetectedMs = 0L
 
     // ────────────────────────────────────────────
     // 每 30 秒執行一次的 tick
@@ -130,6 +148,10 @@ class SleepService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
 
+        // 兩條路（正常 / Demo）都在這裡統一記錄一次原始亮度與更新率
+        captureOriginalBrightnessIfNeeded()
+        captureOriginalRefreshSettingsIfNeeded()
+
         if (intent?.getBooleanExtra(EXTRA_DEMO, false) == true) {
             startDemoSession(prefs)
             return START_NOT_STICKY
@@ -150,17 +172,15 @@ class SleepService : Service() {
             .putInt(KEY_MODE, selectedMode)
             .apply()
 
-        // 記錄原始亮度（僅記一次）
-        if (originalBrightness == -1 && Settings.System.canWrite(this)) {
-            originalBrightness = Settings.System.getInt(
-                contentResolver, Settings.System.SCREEN_BRIGHTNESS, 200
-            )
-        }
-        captureOriginalRefreshSettingsIfNeeded()
-
         isDemoMode = false
         isDemoModeActive = false
         handler.removeCallbacks(demoRunnable)
+
+        // 重置 override 偵測狀態
+        lastAppliedBrightness = -1
+        lastGrayscaleEnabled = false
+        usingSystemGrayscale = false
+        userOverrideDetectedMs = 0L
 
         startForeground(1, buildNotification("睡眠引導中", "背景監控中，等待睡覺時間…"))
 
@@ -206,9 +226,72 @@ class SleepService : Service() {
         }
 
         val diffMin = (System.currentTimeMillis() - sleepTimeMillis) / 60_000.0
+
+        // ── 使用者手動還原偵測 ─────────────────────────────────
+        if (detectUserOverride(diffMin)) {
+            if (userOverrideDetectedMs == 0L) {
+                userOverrideDetectedMs = System.currentTimeMillis()
+            }
+        }
+
+        if (userOverrideDetectedMs > 0L) {
+            val elapsed = System.currentTimeMillis() - userOverrideDetectedMs
+            if (elapsed < OVERRIDE_GRACE_MS) {
+                val remainingMin = ((OVERRIDE_GRACE_MS - elapsed) / 60_000L + 1).coerceAtLeast(1)
+                updateNotification(
+                    "暫停調整",
+                    "偵測到手動調整亮度／灰階，將在 ${remainingMin} 分鐘後自動恢復 💤"
+                )
+                return
+            } else {
+                // 寬限期結束，以現在的亮度作為新基準，重新開始調整
+                userOverrideDetectedMs = 0L
+                if (Settings.System.canWrite(this)) {
+                    val current = Settings.System.getInt(
+                        contentResolver, Settings.System.SCREEN_BRIGHTNESS, originalBrightness
+                    )
+                    if (current > 0) originalBrightness = current
+                }
+                lastAppliedBrightness = -1
+                lastGrayscaleEnabled = false
+            }
+        }
+        // ──────────────────────────────────────────────────────
+
         val (phase, noticeText) = evaluatePhase(diffMin)
         applyEffectsForDiffMin(diffMin)
         updateNotification(phase, noticeText)
+    }
+
+    /**
+     * 偵測使用者是否手動把亮度或灰階調回來：
+     * - 亮度：現在的系統亮度比我們上次設定的高出超過 20（約 8% 的 0-255 範圍）
+     * - 灰階：我們啟用了系統灰階，但現在發現它已被關閉
+     */
+    private fun detectUserOverride(diffMin: Double): Boolean {
+        if (diffMin < DIM_START_MIN) return false
+
+        if (selectedMode == MODE_NETWORK_ONLY || selectedMode == MODE_REFRESH_ONLY) return false
+
+        // 亮度偵測
+        if (lastAppliedBrightness > 0 && Settings.System.canWrite(this)) {
+            val current = Settings.System.getInt(
+                contentResolver, Settings.System.SCREEN_BRIGHTNESS, lastAppliedBrightness
+            )
+            if (current > lastAppliedBrightness + 20) return true
+        }
+
+        // 系統灰階偵測（僅在透過 WRITE_SECURE_SETTINGS 啟用時才查）
+        if (usingSystemGrayscale && lastGrayscaleEnabled && diffMin >= GRAY_START_MIN) {
+            val stillEnabled = try {
+                Settings.Secure.getInt(
+                    contentResolver, "accessibility_display_daltonizer_enabled"
+                ) == 1
+            } catch (_: Settings.SettingNotFoundException) { false }
+            if (!stillEnabled) return true
+        }
+
+        return false
     }
 
     private fun startDemoSession(prefs: android.content.SharedPreferences) {
@@ -221,12 +304,7 @@ class SleepService : Service() {
         demoEndWallClock = demoStartWallClock + DEMO_DURATION_MS
         wakeTimeMillis = Long.MAX_VALUE
 
-        if (originalBrightness == -1 && Settings.System.canWrite(this)) {
-            originalBrightness = Settings.System.getInt(
-                contentResolver, Settings.System.SCREEN_BRIGHTNESS, 200
-            )
-        }
-        captureOriginalRefreshSettingsIfNeeded()
+        // 亮度與更新率的原始值已在 onStartCommand 統一擷取，此處不重複
 
         startForeground(1, buildNotification("Demo 演練", "60 秒內輪播四種勸睡模式（各 15 秒）…"))
         handler.post(demoRunnable)
@@ -398,10 +476,9 @@ class SleepService : Service() {
 
     private fun resetNetworkThrottle() {
         currentNetCapKbps = null
-        val intent = Intent(this, PulseThrottleVpnService::class.java).apply {
-            action = PulseThrottleVpnService.ACTION_STOP
-        }
-        startService(intent)
+        // 用 stopService 而非 startService(ACTION_STOP)，
+        // 避免在 onDestroy 背景狀態下呼叫 startService 可能的 IllegalStateException
+        stopService(Intent(this, PulseThrottleVpnService::class.java))
     }
 
     private fun applyRefreshRateByTimeline(diffMin: Double) {
@@ -482,6 +559,40 @@ class SleepService : Service() {
     // ────────────────────────────────────────────
     // 系統亮度（Settings.System.SCREEN_BRIGHTNESS，0-255）
     // ────────────────────────────────────────────
+
+    /**
+     * 第一次呼叫時記錄原始亮度與亮度模式，並寫入 SharedPreferences。
+     * 服務若被 START_STICKY 殺掉重啟，會從 prefs 讀回正確的原始值，
+     * 避免把「已調暗」的亮度當成原始亮度而永遠還原不回去。
+     */
+    private fun captureOriginalBrightnessIfNeeded() {
+        if (originalBrightness != -1) return
+        if (!Settings.System.canWrite(this)) return
+        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+        val saved = prefs.getInt(KEY_ORIGINAL_BRIGHTNESS, -1)
+        if (saved > 0) {
+            // 服務被重啟：從 prefs 還原，而非讀取已被調暗的當前亮度
+            originalBrightness = saved
+            originalBrightnessMode = prefs.getInt(
+                KEY_ORIGINAL_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+            )
+        } else {
+            // 首次啟動：讀取當前亮度與模式，並持久化
+            originalBrightness = Settings.System.getInt(
+                contentResolver, Settings.System.SCREEN_BRIGHTNESS, 200
+            )
+            originalBrightnessMode = Settings.System.getInt(
+                contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+            )
+            prefs.edit()
+                .putInt(KEY_ORIGINAL_BRIGHTNESS, originalBrightness)
+                .putInt(KEY_ORIGINAL_BRIGHTNESS_MODE, originalBrightnessMode)
+                .apply()
+        }
+    }
+
     private fun applyBrightnessDim(dimPct: Int) {
         if (!Settings.System.canWrite(this)) return
         val base   = if (originalBrightness > 0) originalBrightness else 200
@@ -489,16 +600,29 @@ class SleepService : Service() {
         Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
         Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, target)
+        lastAppliedBrightness = target
     }
 
     private fun restoreBrightness() {
+        lastAppliedBrightness = -1
+        userOverrideDetectedMs = 0L
         if (!Settings.System.canWrite(this)) return
         if (originalBrightness > 0) {
             Settings.System.putInt(contentResolver,
                 Settings.System.SCREEN_BRIGHTNESS, originalBrightness)
         }
-        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
+        // 還原使用者原本的亮度模式（手動/自動），而非一律強制切到自動
+        val modeToRestore = if (originalBrightnessMode != -1) originalBrightnessMode
+                            else Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+        Settings.System.putInt(contentResolver,
+            Settings.System.SCREEN_BRIGHTNESS_MODE, modeToRestore)
+        // 清除持久化的快照，讓下次啟動能重新讀取正確的原始值
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .remove(KEY_ORIGINAL_BRIGHTNESS)
+            .remove(KEY_ORIGINAL_BRIGHTNESS_MODE)
+            .apply()
+        originalBrightness = -1
+        originalBrightnessMode = -1
     }
 
     // ────────────────────────────────────────────
@@ -506,10 +630,15 @@ class SleepService : Service() {
     // Overlay 設 FLAG_NOT_TOUCHABLE，確保彈出視窗與互動不受阻擋
     // ────────────────────────────────────────────
     private fun applyGrayscale(pct: Int) {
-        if (trySetSystemGrayscale(pct > 0)) {
+        val enable = pct > 0
+        if (trySetSystemGrayscale(enable)) {
+            usingSystemGrayscale = true
+            lastGrayscaleEnabled = enable
             grayView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
             grayView = null
         } else {
+            usingSystemGrayscale = false
+            lastGrayscaleEnabled = enable
             val alpha = pct / 100f * 0.75f
             ensureGrayOverlay()
             grayView?.alpha = alpha

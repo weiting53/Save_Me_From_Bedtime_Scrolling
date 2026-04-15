@@ -44,7 +44,9 @@ class PulseThrottleVpnService : VpnService() {
                 handler.postDelayed(this, (cycleMs - blockMs).coerceAtLeast(200L))
             } else {
                 setupBlockTunnel()
-                isBlocked = true
+                // establish() 可能回傳 null（VPN 設定失敗），
+                // 只有真正建立成功才算進入 blocked 狀態
+                isBlocked = tunInterface != null
                 handler.postDelayed(this, blockMs.coerceAtLeast(200L))
             }
             updateNotification()
@@ -99,16 +101,22 @@ class PulseThrottleVpnService : VpnService() {
 
     /**
      * 建立一條不轉發的 TUN，等同暫時阻斷網路。
+     * establish() 可能回傳 null（VPN 被使用者拒絕或系統限制），
+     * 回傳 null 時 tunInterface 保持 null，pulseRunnable 會正確處理不進入 blocked 狀態。
      */
     private fun setupBlockTunnel() {
         if (tunInterface != null) return
-        tunInterface = Builder()
-            .setSession("SleepGuardianThrottle")
-            .addAddress("10.0.0.2", 32)
-            .addDnsServer("1.1.1.1")
-            .addRoute("0.0.0.0", 0)
-            .setMtu(1500)
-            .establish()
+        tunInterface = try {
+            Builder()
+                .setSession("SleepGuardianThrottle")
+                .addAddress("10.0.0.2", 32)
+                .addDnsServer("1.1.1.1")
+                .addRoute("0.0.0.0", 0)
+                .setMtu(1500)
+                .establish()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun teardownBlockTunnel() {

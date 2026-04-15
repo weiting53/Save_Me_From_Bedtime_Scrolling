@@ -10,28 +10,28 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.Glide
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
 
-    private enum class PermissionFlow {
-        NONE,
-        START_GUARDIAN,
-        DEMO
-    }
+    private enum class PermissionFlow { NONE, START_GUARDIAN, DEMO }
 
     private var selectedHour   = 23
     private var selectedMinute = 0
-    private var wakeHour       = 5    // 預設起床時間 05:00
+    private var wakeHour       = 5
     private var wakeMinute     = 0
     private var selectedMode   = SleepService.MODE_BUNDLE
     private var permissionFlow = PermissionFlow.NONE
 
+    // ── Activity Result Launchers ──────────────────────────────
     private val overlayLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { resumePermissionFlow() }
@@ -50,83 +50,87 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK) {
             resumePermissionFlow()
         } else {
-            when (permissionFlow) {
-                PermissionFlow.START_GUARDIAN ->
-                    tvStatus.text = "❌ 需要 VPN 權限才能使用降網速模式"
-                PermissionFlow.DEMO ->
-                    tvStatus.text = "❌ Demo 需 VPN 才能展示降網速段落"
-                else -> Unit
+            val msg = when (permissionFlow) {
+                PermissionFlow.START_GUARDIAN -> "❌ 需要 VPN 權限才能使用降網速模式"
+                PermissionFlow.DEMO          -> "❌ Demo 需 VPN 才能展示降網速段落"
+                else -> ""
             }
+            if (msg.isNotEmpty()) Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
             permissionFlow = PermissionFlow.NONE
         }
     }
 
-    private val modeLabels = listOf(
-        "組合包（亮度 ＋ 灰階 ＋ 網速 ＋ 更新率）",
-        "亮度 ＋ 灰階",
-        "僅降網速",
-        "僅降更新率"
-    )
-    private val modeDots = listOf("● ○ ○ ○", "○ ● ○ ○", "○ ○ ● ○", "○ ○ ○ ●")
+    // ── Views ──────────────────────────────────────────────────
+    private lateinit var clockView:   SegmentClockView
+    private lateinit var tvWakeTime:  TextView
+    private lateinit var tvPhase:     TextView
+    private lateinit var btnStart:    Button
+    private lateinit var btnStop:     Button
+    private lateinit var modeScroll:  HorizontalScrollView
+    private lateinit var card0:       GlowCardView
+    private lateinit var card1:       GlowCardView
+    private lateinit var card2:       GlowCardView
+    private lateinit var card3:       GlowCardView
+    private lateinit var swDaily:     Switch
+    private lateinit var tvDemo:      TextView
+    private lateinit var tvAdbHint:   TextView
+    private lateinit var ivSleeping:  ImageView
 
-    // ── 元素
-    private lateinit var tvSleepTime:  TextView
-    private lateinit var tvWakeTime:   TextView
-    private lateinit var tvStatus:     TextView
-    private lateinit var btnStart:     Button
-    private lateinit var btnStop:      Button
-    private lateinit var tvPhase:      TextView
-    private lateinit var btnModePrev:  Button
-    private lateinit var btnModeNext:  Button
-    private lateinit var tvModeLabel:  TextView
-    private lateinit var tvModeDots:   TextView
-    private lateinit var swDaily:      Switch
-    private lateinit var tvDemo:       TextView
-    private lateinit var tvAdbHint:    TextView
+    // 卡片滑動後 snap 到最近的卡片（延遲觸發）
+    private val snapRunnable = Runnable { snapToNearestCard() }
 
+    // ── Lifecycle ──────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvSleepTime  = findViewById(R.id.tv_sleep_time)
-        tvWakeTime   = findViewById(R.id.tv_wake_time)
-        tvStatus     = findViewById(R.id.tv_status)
-        btnStart     = findViewById(R.id.btn_start)
-        btnStop      = findViewById(R.id.btn_stop)
-        tvPhase      = findViewById(R.id.tv_phase)
-        btnModePrev  = findViewById(R.id.btn_mode_prev)
-        btnModeNext  = findViewById(R.id.btn_mode_next)
-        tvModeLabel  = findViewById(R.id.tv_mode_label)
-        tvModeDots   = findViewById(R.id.tv_mode_dots)
-        swDaily      = findViewById(R.id.sw_daily_schedule)
-        tvDemo       = findViewById(R.id.tv_demo)
-        tvAdbHint    = findViewById(R.id.tv_adb_hint)
+        clockView  = findViewById(R.id.clock_view)
+        tvWakeTime = findViewById(R.id.tv_wake_time)
+        tvPhase    = findViewById(R.id.tv_phase)
+        btnStart   = findViewById(R.id.btn_start)
+        btnStop    = findViewById(R.id.btn_stop)
+        modeScroll = findViewById(R.id.mode_scroll)
+        card0      = findViewById(R.id.card_0)
+        card1      = findViewById(R.id.card_1)
+        card2      = findViewById(R.id.card_2)
+        card3      = findViewById(R.id.card_3)
+        swDaily    = findViewById(R.id.sw_daily_schedule)
+        tvDemo     = findViewById(R.id.tv_demo)
+        tvAdbHint  = findViewById(R.id.tv_adb_hint)
+        ivSleeping = findViewById(R.id.iv_sleeping)
 
-        // 從 SharedPreferences 讀取上次設定
+        // 載入 GIF 動畫（Glide 自動循環播放）
+        Glide.with(this)
+            .asGif()
+            .load(R.drawable.bunny_sleep)
+            .into(ivSleeping)
+
+        // 讀取上次設定
         val prefs = getSharedPreferences(SleepService.PREFS, MODE_PRIVATE)
-        selectedHour   = prefs.getInt(SleepService.KEY_HOUR,         23)
-        selectedMinute = prefs.getInt(SleepService.KEY_MINUTE,        0)
-        wakeHour       = prefs.getInt(SleepService.KEY_WAKE_HOUR,     5)
-        wakeMinute     = prefs.getInt(SleepService.KEY_WAKE_MINUTE,   0)
+        selectedHour   = prefs.getInt(SleepService.KEY_HOUR,       23)
+        selectedMinute = prefs.getInt(SleepService.KEY_MINUTE,      0)
+        wakeHour       = prefs.getInt(SleepService.KEY_WAKE_HOUR,   5)
+        wakeMinute     = prefs.getInt(SleepService.KEY_WAKE_MINUTE, 0)
         selectedMode   = prefs.getInt(SleepService.KEY_MODE, SleepService.MODE_BUNDLE)
 
-        updateSleepTimeDisplay()
+        updateClockDisplay()
         updateWakeTimeDisplay()
-        setupModeBar()
+        setupModeCards()
 
+        swDaily.isChecked = SleepScheduleHelper.isDailyEnabled(this)
         swDaily.setOnCheckedChangeListener { _, isChecked ->
             SleepScheduleHelper.setDailyEnabled(this, isChecked)
             refreshUI()
         }
-        swDaily.isChecked = SleepScheduleHelper.isDailyEnabled(this)
 
-        // 點擊整個時間區域（數字 + 編輯圖示）皆可觸發選擇器
-        findViewById<android.view.View>(R.id.time_sleep_area).setOnClickListener { showSleepTimePicker() }
-        findViewById<android.view.View>(R.id.time_wake_area).setOnClickListener  { showWakeTimePicker() }
+        // 點擊時鐘修改睡覺時間
+        clockView.setOnClickListener { showSleepTimePicker() }
+        // 起床時間（time_wake_area 是整個 LinearLayout）
+        findViewById<android.view.View>(R.id.time_wake_area).setOnClickListener { showWakeTimePicker() }
 
-        btnStart.setOnClickListener { checkPermissionsAndStart() }
-        btnStop.setOnClickListener  { stopGuardian() }
-        tvDemo.setOnClickListener   { tryStartDemo() }
+        btnStart.setOnClickListener  { checkPermissionsAndStart() }
+        btnStop.setOnClickListener   { stopGuardian() }
+        tvDemo.setOnClickListener    { tryStartDemo() }
         tvAdbHint.setOnClickListener { showAdbDialog() }
 
         if (SleepScheduleHelper.isDailyEnabled(this)) {
@@ -139,12 +143,12 @@ class MainActivity : AppCompatActivity() {
         refreshUI()
     }
 
-    // ── 睡覺時間選擇器
+    // ── 時間選擇器 ─────────────────────────────────────────────
     private fun showSleepTimePicker() {
         TimePickerDialog(this, { _, hour, minute ->
             selectedHour   = hour
             selectedMinute = minute
-            updateSleepTimeDisplay()
+            updateClockDisplay()
             getSharedPreferences(SleepService.PREFS, MODE_PRIVATE).edit()
                 .putInt(SleepService.KEY_HOUR,   hour)
                 .putInt(SleepService.KEY_MINUTE, minute)
@@ -155,7 +159,6 @@ class MainActivity : AppCompatActivity() {
         }, selectedHour, selectedMinute, true).show()
     }
 
-    // ── 起床時間選擇器
     private fun showWakeTimePicker() {
         TimePickerDialog(this, { _, hour, minute ->
             wakeHour   = hour
@@ -168,49 +171,77 @@ class MainActivity : AppCompatActivity() {
         }, wakeHour, wakeMinute, true).show()
     }
 
-    private fun updateSleepTimeDisplay() {
-        tvSleepTime.text = String.format("%02d:%02d", selectedHour, selectedMinute)
+    private fun updateClockDisplay() {
+        clockView.hour   = selectedHour
+        clockView.minute = selectedMinute
     }
 
     private fun updateWakeTimeDisplay() {
         tvWakeTime.text = String.format("%02d:%02d", wakeHour, wakeMinute)
     }
 
-    private fun setupModeBar() {
-        updateModeBar()
-        btnModePrev.setOnClickListener {
-            selectedMode = (selectedMode - 1 + modeLabels.size) % modeLabels.size
-            saveModePreference()
-            updateModeBar()
+    // ── 模式卡片（橫滑 + 點選 + snap） ────────────────────────
+    private fun setupModeCards() {
+        // 初始高亮
+        updateCardGlow(selectedMode)
+
+        listOf(card0, card1, card2, card3).forEachIndexed { idx, card ->
+            card.setOnClickListener {
+                updateCardGlow(idx)
+                scrollToCard(idx)
+                selectedMode = idx
+                saveMode()
+            }
         }
-        btnModeNext.setOnClickListener {
-            selectedMode = (selectedMode + 1) % modeLabels.size
-            saveModePreference()
-            updateModeBar()
+
+        // 滑動後 snap
+        modeScroll.setOnScrollChangeListener { _, _, _, _, _ ->
+            modeScroll.removeCallbacks(snapRunnable)
+            modeScroll.postDelayed(snapRunnable, 140)
         }
     }
 
-    private fun updateModeBar() {
-        val idx = selectedMode.coerceIn(0, modeLabels.lastIndex)
-        tvModeLabel.text = modeLabels[idx]
-        tvModeDots.text  = modeDots[idx]
+    private fun updateCardGlow(active: Int) {
+        listOf(card0, card1, card2, card3).forEachIndexed { i, card ->
+            card.isGlowing = (i == active)
+        }
     }
 
-    private fun saveModePreference() {
+    private fun scrollToCard(idx: Int) {
+        val cardWidthPx = (200 * resources.displayMetrics.density).toInt()
+        val gapPx       = (16  * resources.displayMetrics.density).toInt()
+        modeScroll.smoothScrollTo(idx * (cardWidthPx + gapPx), 0)
+    }
+
+    private fun snapToNearestCard() {
+        val cardWidthPx = (200 * resources.displayMetrics.density).toInt()
+        val gapPx       = (16  * resources.displayMetrics.density).toInt()
+        val step        = (cardWidthPx + gapPx).toFloat()
+        val scrollX     = modeScroll.scrollX
+        val nearest     = Math.round(scrollX / step).coerceIn(0, 3)
+        modeScroll.smoothScrollTo(nearest * (cardWidthPx + gapPx), 0)
+        if (selectedMode != nearest) {
+            selectedMode = nearest
+            saveMode()
+            updateCardGlow(nearest)
+        }
+    }
+
+    private fun saveMode() {
         getSharedPreferences(SleepService.PREFS, MODE_PRIVATE).edit()
             .putInt(SleepService.KEY_MODE, selectedMode)
             .apply()
     }
 
+    // ── 權限流程 ────────────────────────────────────────────────
     private fun resumePermissionFlow() {
         when (permissionFlow) {
             PermissionFlow.START_GUARDIAN -> checkPermissionsAndStartInternal()
-            PermissionFlow.DEMO -> tryStartDemoInternal()
-            PermissionFlow.NONE -> Unit
+            PermissionFlow.DEMO          -> tryStartDemoInternal()
+            PermissionFlow.NONE          -> Unit
         }
     }
 
-    // ── 依序檢查所有必要權限
     private fun checkPermissionsAndStart() {
         permissionFlow = PermissionFlow.START_GUARDIAN
         checkPermissionsAndStartInternal()
@@ -219,18 +250,14 @@ class MainActivity : AppCompatActivity() {
     private fun checkPermissionsAndStartInternal() {
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "請允許「在其他應用程式上方顯示」的權限（灰階遮罩需要）", Toast.LENGTH_LONG).show()
-            overlayLauncher.launch(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName"))
-            )
+            overlayLauncher.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")))
             return
         }
         if (!Settings.System.canWrite(this)) {
             Toast.makeText(this, "請允許「修改系統設定」的權限（用於控制亮度）", Toast.LENGTH_LONG).show()
-            writeSettingsLauncher.launch(
-                Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                    Uri.parse("package:$packageName"))
-            )
+            writeSettingsLauncher.launch(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                Uri.parse("package:$packageName")))
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -252,18 +279,15 @@ class MainActivity : AppCompatActivity() {
         attemptStart()
     }
 
-    private fun requiresNetworkThrottle(mode: Int): Boolean {
-        return mode == SleepService.MODE_BUNDLE || mode == SleepService.MODE_NETWORK_ONLY
-    }
+    private fun requiresNetworkThrottle(mode: Int) =
+        mode == SleepService.MODE_BUNDLE || mode == SleepService.MODE_NETWORK_ONLY
 
     private fun tryStartDemo() {
         if (SleepService.isRunning && !SleepService.isDemoModeActive) {
-            Toast.makeText(this, "請先停止睡眠引導再試 Demo", Toast.LENGTH_SHORT).show()
-            return
+            Toast.makeText(this, "請先停止睡眠引導再試 Demo", Toast.LENGTH_SHORT).show(); return
         }
         if (SleepService.isDemoModeActive) {
-            Toast.makeText(this, "Demo 進行中", Toast.LENGTH_SHORT).show()
-            return
+            Toast.makeText(this, "Demo 進行中", Toast.LENGTH_SHORT).show(); return
         }
         permissionFlow = PermissionFlow.DEMO
         tryStartDemoInternal()
@@ -272,32 +296,26 @@ class MainActivity : AppCompatActivity() {
     private fun tryStartDemoInternal() {
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "Demo 需要 Overlay 權限（灰階遮罩）", Toast.LENGTH_LONG).show()
-            overlayLauncher.launch(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName"))
-            )
-            return
+            overlayLauncher.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName"))); return
         }
         if (!Settings.System.canWrite(this)) {
             Toast.makeText(this, "Demo 需要「修改系統設定」權限", Toast.LENGTH_LONG).show()
-            writeSettingsLauncher.launch(
-                Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                    Uri.parse("package:$packageName"))
-            )
-            return
+            writeSettingsLauncher.launch(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
+                Uri.parse("package:$packageName"))); return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED) {
-                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                return
+                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS); return
             }
         }
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
-            Toast.makeText(this, "Demo 會輪播降網速，請允許 VPN", Toast.LENGTH_LONG).show()
-            vpnLauncher.launch(prepareIntent)
-            return
+            Toast.makeText(this,
+                "Demo 中的「降網速」與「組合包」段落需要 VPN 權限，拒絕則只有那兩段無效果",
+                Toast.LENGTH_LONG).show()
+            vpnLauncher.launch(prepareIntent); return
         }
         permissionFlow = PermissionFlow.NONE
         launchDemoService()
@@ -307,11 +325,8 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, SleepService::class.java).apply {
             putExtra(SleepService.EXTRA_DEMO, true)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
         refreshUI()
     }
 
@@ -328,65 +343,49 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("知道了", null)
             .setNeutralButton("複製指令") { _, _ ->
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(
-                    android.content.ClipData.newPlainText("ADB 指令", cmd)
-                )
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ADB 指令", cmd))
                 Toast.makeText(this, "已複製到剪貼簿", Toast.LENGTH_SHORT).show()
             }
             .show()
     }
 
-    // ── 所有權限就緒後啟動服務
+    // ── 啟動 / 停止服務 ─────────────────────────────────────────
     private fun attemptStart() {
         if (!Settings.canDrawOverlays(this)) {
-            tvStatus.text = "❌ 需要「Overlay」權限才能啟動"
-            return
+            Toast.makeText(this, "❌ 需要 Overlay 權限", Toast.LENGTH_SHORT).show(); return
         }
         if (!Settings.System.canWrite(this)) {
-            tvStatus.text = "❌ 需要「修改系統設定」權限才能控制亮度"
-            return
+            Toast.makeText(this, "❌ 需要修改系統設定權限", Toast.LENGTH_SHORT).show(); return
         }
-
         val (sleepMillis, wakeMillis) = SleepTimeCalculator.computeNextSleepAndWakeMillis(this)
-
         val intent = Intent(this, SleepService::class.java).apply {
             putExtra(SleepService.EXTRA_SLEEP_TIME, sleepMillis)
             putExtra(SleepService.EXTRA_WAKE_TIME,  wakeMillis)
             putExtra(SleepService.EXTRA_MODE, selectedMode)
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-
-        if (SleepScheduleHelper.isDailyEnabled(this)) {
-            SleepScheduleHelper.scheduleNextOccurrence(this)
-        }
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
+        if (SleepScheduleHelper.isDailyEnabled(this)) SleepScheduleHelper.scheduleNextOccurrence(this)
         refreshUI()
     }
 
-    // ── 停止服務
     private fun stopGuardian() {
         stopService(Intent(this, SleepService::class.java))
         refreshUI()
     }
 
-    // ── 根據服務狀態更新 UI
+    // ── UI 更新 ─────────────────────────────────────────────────
     private fun refreshUI() {
         if (SleepService.isDemoModeActive) {
-            swDaily.isEnabled = false
+            swDaily.isEnabled  = false
             btnStart.isEnabled = false
             btnStop.isEnabled  = true
             btnStart.alpha     = 0.35f
-            tvPhase.text       = "Demo 演練中"
-            tvStatus.text      = "約 15 秒內依序模擬：組合包 → 亮度灰階 → 僅降網速 → 僅降更新率（通知可看階段）"
+            tvPhase.text       = "● DEMO  IN PROGRESS"
             return
         }
-        swDaily.isEnabled = true
 
+        swDaily.isEnabled = true
         val running = SleepService.isRunning
         btnStart.isEnabled = !running
         btnStop.isEnabled  = running
@@ -395,42 +394,21 @@ class MainActivity : AppCompatActivity() {
         if (running) {
             val prefs       = getSharedPreferences(SleepService.PREFS, MODE_PRIVATE)
             val sleepMillis = prefs.getLong(SleepService.KEY_SLEEP_TIME, 0L)
-            val wakeMillis  = prefs.getLong(SleepService.KEY_WAKE_TIME,  0L)
             val diffMin     = (System.currentTimeMillis() - sleepMillis) / 60_000.0
 
             tvPhase.text = when {
-                sleepMillis == 0L                           -> "引導執行中"
-                diffMin < 0                                  -> "等待睡覺時間（還有 ${(-diffMin).toInt()} 分鐘）"
-                diffMin < SleepService.DIM_START_MIN         -> "就寢時刻已到"
-                diffMin < SleepService.GRAY_START_MIN        -> "漸暗模式進行中"
-                else                                         -> "灰階模式進行中"
+                sleepMillis == 0L                            -> "● ACTIVE"
+                diffMin < 0                                  -> "● WAITING  ${(-diffMin).toInt()} min"
+                diffMin < SleepService.DIM_START_MIN         -> "● BEDTIME"
+                diffMin < SleepService.GRAY_START_MIN        -> "● DIMMING"
+                else                                         -> "● GRAYSCALE"
             }
-
-            val modeText = when (prefs.getInt(SleepService.KEY_MODE, SleepService.MODE_BUNDLE)) {
-                SleepService.MODE_DIM_GRAY_ONLY -> "（各自功能：亮度＋灰階）"
-                SleepService.MODE_NETWORK_ONLY -> "（各自功能：僅降網速）"
-                SleepService.MODE_REFRESH_ONLY -> "（各自功能：僅降更新率）"
-                else -> "（組合包）"
-            }
-
-            val wakeStr = if (wakeMillis > 0 && wakeMillis != Long.MAX_VALUE) {
-                val cal = Calendar.getInstance().apply { timeInMillis = wakeMillis }
-                String.format("，%02d:%02d 自動關閉", cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
-            } else ""
-
-            val dailyStr = if (SleepScheduleHelper.isDailyEnabled(this)) {
-                " · 每日排程已開啟"
-            } else ""
-
-            tvStatus.text = "✅ 睡眠引導背景執行中$wakeStr $modeText$dailyStr"
         } else {
-            tvPhase.text  = "尚未啟動"
-            val dailyStr = if (SleepScheduleHelper.isDailyEnabled(this)) {
-                "已開啟「每日自動開始」，將在預計睡覺時間自動啟動（仍須具備權限）。"
+            tvPhase.text = if (SleepScheduleHelper.isDailyEnabled(this)) {
+                "AUTO  NEXT: ${String.format("%02d:%02d", selectedHour, selectedMinute)}"
             } else {
-                "點「開始引導」讓引導在背景運行"
+                "IDLE"
             }
-            tvStatus.text = dailyStr
         }
     }
 }
