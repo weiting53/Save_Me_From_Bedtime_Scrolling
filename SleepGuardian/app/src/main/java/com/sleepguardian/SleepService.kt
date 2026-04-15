@@ -67,7 +67,8 @@ class SleepService : Service() {
         // 更細緻曲線：系統會自動映射到裝置實際支援的最接近檔位（最低 60Hz）
         val REFRESH_LEVELS_HZ = floatArrayOf(110f, 100f, 90f, 80f, 72f, 60f)
 
-        const val CHANNEL_ID = "sleep_guardian_channel"
+        const val CHANNEL_ID         = "sleep_guardian_channel"
+        const val CHECKIN_CHANNEL_ID = "sleep_guardian_checkin_channel"
 
         /** 使用者手動還原後的寬限期（5 分鐘），期間不重新套用調整 */
         private const val OVERRIDE_GRACE_MS = 5 * 60_000L
@@ -80,6 +81,10 @@ class SleepService : Service() {
 
         @Volatile var isRunning = false
         @Volatile var isDemoModeActive = false
+
+        /** 即時效果狀態，供 MainActivity 顯示預覽（0 = 尚未套用） */
+        @Volatile var currentDimPct:  Int = 0
+        @Volatile var currentGrayPct: Int = 0
     }
 
     private lateinit var windowManager: WindowManager
@@ -196,6 +201,8 @@ class SleepService : Service() {
         isDemoMode = false
         isDemoModeActive = false
         lastDemoSegment = -1
+        currentDimPct  = 0
+        currentGrayPct = 0
         handler.removeCallbacks(tickRunnable)
         handler.removeCallbacks(demoRunnable)
 
@@ -221,6 +228,7 @@ class SleepService : Service() {
         if (wakeTimeMillis > 0 && wakeTimeMillis != Long.MAX_VALUE &&
             System.currentTimeMillis() >= wakeTimeMillis) {
             updateNotification("自動關閉", "已到起床時間，引導結束，早安 ☀️")
+            sendMorningCheckInNotification()
             handler.postDelayed({ stopSelf() }, 2_000L)
             return
         }
@@ -601,6 +609,7 @@ class SleepService : Service() {
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
         Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, target)
         lastAppliedBrightness = target
+        currentDimPct = dimPct
     }
 
     private fun restoreBrightness() {
@@ -631,6 +640,7 @@ class SleepService : Service() {
     // ────────────────────────────────────────────
     private fun applyGrayscale(pct: Int) {
         val enable = pct > 0
+        currentGrayPct = pct
         if (trySetSystemGrayscale(enable)) {
             usingSystemGrayscale = true
             lastGrayscaleEnabled = enable
@@ -700,16 +710,15 @@ class SleepService : Service() {
     // ────────────────────────────────────────────
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "睡眠引導",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "睡眠引導背景服務通知"
-                setShowBadge(false)
-            }
-            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "睡眠引導", NotificationManager.IMPORTANCE_LOW)
+                    .apply { description = "睡眠引導背景服務通知"; setShowBadge(false) }
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CHECKIN_CHANNEL_ID, "睡眠達標確認", NotificationManager.IMPORTANCE_HIGH)
+                    .apply { description = "每日起床時詢問昨晚是否照時間睡覺"; setShowBadge(true) }
+            )
         }
     }
 
@@ -732,5 +741,39 @@ class SleepService : Service() {
     private fun updateNotification(phase: String, text: String) {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(1, buildNotification("睡眠引導・$phase", text))
+    }
+
+    /**
+     * 到起床時間時發送 morning check-in 通知，讓使用者回報昨晚是否達標。
+     * 通知上有「有做到 ✅」和「沒有 ❌」兩個 Action，點擊後交給 CheckInReceiver 處理。
+     */
+    private fun sendMorningCheckInNotification() {
+        val yesIntent = PendingIntent.getBroadcast(
+            this, 10,
+            Intent(this, CheckInReceiver::class.java).apply { action = CheckInReceiver.ACTION_YES },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val noIntent = PendingIntent.getBroadcast(
+            this, 11,
+            Intent(this, CheckInReceiver::class.java).apply { action = CheckInReceiver.ACTION_NO },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val openIntent = PendingIntent.getActivity(
+            this, 12,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val notification = NotificationCompat.Builder(this, CHECKIN_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_sleep)
+            .setContentTitle("早安！昨晚有照時間睡嗎？")
+            .setContentText("記錄達標可以累積連續天數 🌙")
+            .setContentIntent(openIntent)
+            .addAction(0, "有做到 ✅", yesIntent)
+            .addAction(0, "沒有 ❌", noIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(CheckInReceiver.NOTI_ID, notification)
     }
 }

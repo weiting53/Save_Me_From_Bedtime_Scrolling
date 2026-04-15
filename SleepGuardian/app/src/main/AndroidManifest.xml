@@ -77,5 +77,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".CheckInReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sleepguardian.CHECKIN_YES" />
+                <action android:name="com.sleepguardian.CHECKIN_NO" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

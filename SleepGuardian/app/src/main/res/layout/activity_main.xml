@@ -304,6 +304,19 @@
             android:fontFamily="monospace"/>
     </LinearLayout>
 
+    <!-- ── Streak 連續達標 ── -->
+    <TextView
+        android:id="@+id/tv_streak"
+        android:layout_width="wrap_content"
+        android:layout_height="22dp"
+        android:layout_gravity="center_horizontal"
+        android:gravity="center_vertical"
+        android:text="STREAK  —"
+        android:textColor="#444444"
+        android:textSize="8sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.22"/>
+
     <!-- ── 睡眠插畫（兔兔與女孩 GIF） ── -->
     <ImageView
         android:id="@+id/iv_sleeping"
@@ -325,6 +338,19 @@
         android:textSize="8sp"
         android:fontFamily="monospace"
         android:letterSpacing="0.22"/>
+
+    <!-- ── 即時效果預覽（運行中才顯示） ── -->
+    <TextView
+        android:id="@+id/tv_live_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#555555"
+        android:textSize="7.5sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.1"
+        android:paddingBottom="2dp"
+        android:visibility="gone"/>
 
     <!-- tv_status: 隱藏（程式碼相容用，重要錯誤訊息透過 Toast 或 tv_phase 顯示） -->
     <TextView

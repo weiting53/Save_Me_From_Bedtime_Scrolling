@@ -8,7 +8,10 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -61,43 +64,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── Views ──────────────────────────────────────────────────
-    private lateinit var clockView:   SegmentClockView
-    private lateinit var tvWakeTime:  TextView
-    private lateinit var tvPhase:     TextView
-    private lateinit var btnStart:    Button
-    private lateinit var btnStop:     Button
-    private lateinit var modeScroll:  HorizontalScrollView
-    private lateinit var card0:       GlowCardView
-    private lateinit var card1:       GlowCardView
-    private lateinit var card2:       GlowCardView
-    private lateinit var card3:       GlowCardView
-    private lateinit var swDaily:     Switch
-    private lateinit var tvDemo:      TextView
-    private lateinit var tvAdbHint:   TextView
-    private lateinit var ivSleeping:  ImageView
+    private lateinit var clockView:    SegmentClockView
+    private lateinit var tvWakeTime:   TextView
+    private lateinit var tvPhase:      TextView
+    private lateinit var tvLiveStatus: TextView
+    private lateinit var tvStreak:     TextView
+    private lateinit var btnStart:     Button
+    private lateinit var btnStop:      Button
+    private lateinit var modeScroll:   HorizontalScrollView
+    private lateinit var card0:        GlowCardView
+    private lateinit var card1:        GlowCardView
+    private lateinit var card2:        GlowCardView
+    private lateinit var card3:        GlowCardView
+    private lateinit var swDaily:      Switch
+    private lateinit var tvDemo:       TextView
+    private lateinit var tvAdbHint:    TextView
+    private lateinit var ivSleeping:   ImageView
 
-    // 卡片滑動後 snap 到最近的卡片（延遲觸發）
+    // ── 卡片 snap ──────────────────────────────────────────────
     private val snapRunnable = Runnable { snapToNearestCard() }
+
+    // ── 前景 UI 定時刷新（每 30 秒更新一次倒數與即時效果）──────
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val uiRefreshRunnable = object : Runnable {
+        override fun run() {
+            refreshUI()
+            uiHandler.postDelayed(this, 30_000L)
+        }
+    }
 
     // ── Lifecycle ──────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        clockView  = findViewById(R.id.clock_view)
-        tvWakeTime = findViewById(R.id.tv_wake_time)
-        tvPhase    = findViewById(R.id.tv_phase)
-        btnStart   = findViewById(R.id.btn_start)
-        btnStop    = findViewById(R.id.btn_stop)
-        modeScroll = findViewById(R.id.mode_scroll)
-        card0      = findViewById(R.id.card_0)
-        card1      = findViewById(R.id.card_1)
-        card2      = findViewById(R.id.card_2)
-        card3      = findViewById(R.id.card_3)
-        swDaily    = findViewById(R.id.sw_daily_schedule)
-        tvDemo     = findViewById(R.id.tv_demo)
-        tvAdbHint  = findViewById(R.id.tv_adb_hint)
-        ivSleeping = findViewById(R.id.iv_sleeping)
+        clockView    = findViewById(R.id.clock_view)
+        tvWakeTime   = findViewById(R.id.tv_wake_time)
+        tvPhase      = findViewById(R.id.tv_phase)
+        tvLiveStatus = findViewById(R.id.tv_live_status)
+        tvStreak     = findViewById(R.id.tv_streak)
+        btnStart     = findViewById(R.id.btn_start)
+        btnStop      = findViewById(R.id.btn_stop)
+        modeScroll   = findViewById(R.id.mode_scroll)
+        card0        = findViewById(R.id.card_0)
+        card1        = findViewById(R.id.card_1)
+        card2        = findViewById(R.id.card_2)
+        card3        = findViewById(R.id.card_3)
+        swDaily      = findViewById(R.id.sw_daily_schedule)
+        tvDemo       = findViewById(R.id.tv_demo)
+        tvAdbHint    = findViewById(R.id.tv_adb_hint)
+        ivSleeping   = findViewById(R.id.iv_sleeping)
 
         // 載入 GIF 動畫（Glide 自動循環播放）
         Glide.with(this)
@@ -123,10 +139,8 @@ class MainActivity : AppCompatActivity() {
             refreshUI()
         }
 
-        // 點擊時鐘修改睡覺時間
         clockView.setOnClickListener { showSleepTimePicker() }
-        // 起床時間（time_wake_area 是整個 LinearLayout）
-        findViewById<android.view.View>(R.id.time_wake_area).setOnClickListener { showWakeTimePicker() }
+        findViewById<View>(R.id.time_wake_area).setOnClickListener { showWakeTimePicker() }
 
         btnStart.setOnClickListener  { checkPermissionsAndStart() }
         btnStop.setOnClickListener   { stopGuardian() }
@@ -141,6 +155,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshUI()
+        uiHandler.postDelayed(uiRefreshRunnable, 30_000L)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        uiHandler.removeCallbacks(uiRefreshRunnable)
     }
 
     // ── 時間選擇器 ─────────────────────────────────────────────
@@ -156,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             if (SleepScheduleHelper.isDailyEnabled(this)) {
                 SleepScheduleHelper.scheduleNextOccurrence(this)
             }
+            refreshUI()  // 重新計算倒數
         }, selectedHour, selectedMinute, true).show()
     }
 
@@ -182,7 +203,6 @@ class MainActivity : AppCompatActivity() {
 
     // ── 模式卡片（橫滑 + 點選 + snap） ────────────────────────
     private fun setupModeCards() {
-        // 初始高亮
         updateCardGlow(selectedMode)
 
         listOf(card0, card1, card2, card3).forEachIndexed { idx, card ->
@@ -194,7 +214,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 滑動後 snap
         modeScroll.setOnScrollChangeListener { _, _, _, _, _ ->
             modeScroll.removeCallbacks(snapRunnable)
             modeScroll.postDelayed(snapRunnable, 140)
@@ -376,12 +395,15 @@ class MainActivity : AppCompatActivity() {
 
     // ── UI 更新 ─────────────────────────────────────────────────
     private fun refreshUI() {
+        refreshStreakDisplay()
+
         if (SleepService.isDemoModeActive) {
-            swDaily.isEnabled  = false
-            btnStart.isEnabled = false
-            btnStop.isEnabled  = true
-            btnStart.alpha     = 0.35f
-            tvPhase.text       = "● DEMO  IN PROGRESS"
+            swDaily.isEnabled    = false
+            btnStart.isEnabled   = false
+            btnStop.isEnabled    = true
+            btnStart.alpha       = 0.35f
+            tvPhase.text         = "● DEMO  IN PROGRESS"
+            tvLiveStatus.visibility = View.GONE
             return
         }
 
@@ -397,18 +419,91 @@ class MainActivity : AppCompatActivity() {
             val diffMin     = (System.currentTimeMillis() - sleepMillis) / 60_000.0
 
             tvPhase.text = when {
-                sleepMillis == 0L                            -> "● ACTIVE"
-                diffMin < 0                                  -> "● WAITING  ${(-diffMin).toInt()} min"
-                diffMin < SleepService.DIM_START_MIN         -> "● BEDTIME"
-                diffMin < SleepService.GRAY_START_MIN        -> "● DIMMING"
-                else                                         -> "● GRAYSCALE"
+                sleepMillis == 0L                     -> "● ACTIVE"
+                diffMin < 0                           -> "● WAITING  ${(-diffMin).toInt()} min"
+                diffMin < SleepService.DIM_START_MIN  -> "● BEDTIME"
+                diffMin < SleepService.GRAY_START_MIN -> "● DIMMING"
+                else                                  -> "● GRAYSCALE"
             }
+
+            // 即時效果預覽：有任何效果才顯示
+            refreshLiveStatusDisplay()
         } else {
-            tvPhase.text = if (SleepScheduleHelper.isDailyEnabled(this)) {
-                "AUTO  NEXT: ${String.format("%02d:%02d", selectedHour, selectedMinute)}"
-            } else {
-                "IDLE"
-            }
+            tvPhase.text = buildIdlePhaseText()
+            tvLiveStatus.visibility = View.GONE
         }
+    }
+
+    /**
+     * 即時效果預覽列（服務運行中才顯示）。
+     * 從 SleepService companion object 直接讀取目前套用的數值。
+     */
+    private fun refreshLiveStatusDisplay() {
+        val dim  = SleepService.currentDimPct
+        val gray = SleepService.currentGrayPct
+        val net  = SleepService.currentNetCapKbps
+        val hz   = SleepService.currentRefreshRateHz
+
+        val parts = mutableListOf<String>()
+        if (dim  > 0) parts += "DIM -${dim}%"
+        if (gray > 0) parts += "GRAY ${gray}%"
+        net?.let { parts += "NET ${it}kbps" }
+        hz?.let  { parts += "${it.toInt()}Hz" }
+
+        if (parts.isEmpty()) {
+            tvLiveStatus.visibility = View.GONE
+        } else {
+            tvLiveStatus.text = parts.joinToString("  ·  ")
+            tvLiveStatus.visibility = View.VISIBLE
+        }
+    }
+
+    /**
+     * Streak 連續達標顯示。
+     * 0 天：低調灰色「STREAK  —」
+     * ≥1 天：亮一點，顯示天數
+     */
+    private fun refreshStreakDisplay() {
+        val streak = StreakHelper.getStreak(this)
+        if (streak <= 0) {
+            tvStreak.text      = "STREAK  —"
+            tvStreak.setTextColor(0xFF444444.toInt())
+        } else {
+            tvStreak.text      = "STREAK  $streak  day${if (streak > 1) "s" else ""}"
+            tvStreak.setTextColor(0xFF888888.toInt())
+        }
+    }
+
+    /**
+     * 服務未運行時的 phase 文字：
+     * - 開啟自動排程 → 顯示倒數「AUTO  IN Xh Ym」
+     * - 關閉自動排程 → 顯示倒數「IN Xh Ym」（方便使用者感知還多久）
+     */
+    private fun buildIdlePhaseText(): String {
+        val countdown = formatCountdown(selectedHour, selectedMinute)
+        return if (SleepScheduleHelper.isDailyEnabled(this)) {
+            "AUTO  IN $countdown"
+        } else {
+            "IDLE  IN $countdown"
+        }
+    }
+
+    /**
+     * 計算現在到目標睡覺時間的倒數（下一次）。
+     * 回傳例如「2h 30m」或「45m」。
+     */
+    private fun formatCountdown(targetHour: Int, targetMinute: Int): String {
+        val now    = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, targetHour)
+            set(Calendar.MINUTE, targetMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val diffMs = target.timeInMillis - now.timeInMillis
+        val h = (diffMs / 3_600_000).toInt()
+        val m = ((diffMs % 3_600_000) / 60_000).toInt()
+        return if (h > 0) "${h}h ${m}m" else "${m}m"
     }
 }
